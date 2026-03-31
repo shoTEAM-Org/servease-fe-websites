@@ -9,7 +9,10 @@ export function RootLayout() {
 
   return (
     <DataProvider>
-      <div className="flex h-screen overflow-hidden bg-gray-50">
+      <div
+        className="flex h-screen overflow-hidden bg-gray-50"
+        style={{ "--sidebar-offset": isSidebarCollapsed ? "5rem" : "16rem" } as React.CSSProperties}
+      >
         {/* Sidebar - Fixed position, scrollable independently */}
         <Sidebar
           isCollapsed={isSidebarCollapsed}
@@ -26,8 +29,8 @@ export function RootLayout() {
           <Header />
 
           {/* Page Content - Scrollable */}
-          <main className="flex-1 overflow-y-auto">
-            <div className="p-6 max-w-[1600px] mx-auto w-full">
+          <main className="flex-1 overflow-y-auto overflow-x-hidden">
+            <div className="p-6 w-full">
               <Outlet />
             </div>
           </main>

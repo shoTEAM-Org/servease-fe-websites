@@ -115,25 +115,25 @@ export function ServiceProviders() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold text-gray-900">Service Providers</h1>
-        <p className="text-gray-500 mt-1">
+        <h1 className="text-2xl font-bold text-gray-900">Service Providers</h1>
+        <p className="text-gray-500 mt-1 text-sm">
           Manage all service providers on the platform
         </p>
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         {stats.map((stat) => (
-          <Card key={stat.title}>
-            <CardContent className="p-6">
+          <Card key={stat.title} className="border-gray-200">
+            <CardContent className="p-5">
               <div className="flex items-center gap-4">
-                <div className={`p-3 rounded-lg ${stat.bgColor}`}>
-                  <stat.icon className={`w-6 h-6 ${stat.color}`} />
+                <div className={`p-2.5 rounded-xl ${stat.bgColor}`}>
+                  <stat.icon className={`w-5 h-5 ${stat.color}`} />
                 </div>
-                <div className="flex-1">
-                  <p className="text-sm text-gray-500">{stat.title}</p>
-                  <p className="text-2xl font-bold text-gray-900 mt-1">{stat.value}</p>
-                  <p className="text-xs text-gray-400 mt-1">{stat.change}</p>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs text-gray-400 uppercase tracking-wide">{stat.title}</p>
+                  <p className="text-2xl font-bold text-gray-900 mt-0.5">{stat.value}</p>
+                  <p className="text-xs text-gray-400 mt-0.5">{stat.change}</p>
                 </div>
               </div>
             </CardContent>
@@ -142,13 +142,13 @@ export function ServiceProviders() {
       </div>
 
       {/* Filters and Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle>All Service Providers</CardTitle>
+      <Card className="border-gray-200">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">All Service Providers</CardTitle>
         </CardHeader>
         <CardContent>
           {/* Filters */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-5">
             {/* Search */}
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -156,13 +156,13 @@ export function ServiceProviders() {
                 placeholder="Search by name, ID, contact person..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-9"
+                className="pl-9 text-sm"
               />
             </div>
 
             {/* Category Filter */}
             <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-              <SelectTrigger>
+              <SelectTrigger className="text-sm">
                 <SelectValue placeholder="Filter by Category" />
               </SelectTrigger>
               <SelectContent>
@@ -178,7 +178,7 @@ export function ServiceProviders() {
 
             {/* Status Filter */}
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger>
+              <SelectTrigger className="text-sm">
                 <SelectValue placeholder="Filter by Status" />
               </SelectTrigger>
               <SelectContent>
@@ -194,41 +194,41 @@ export function ServiceProviders() {
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
-                <TableRow>
-                  <TableHead>Provider ID</TableHead>
-                  <TableHead>Business Name</TableHead>
-                  <TableHead>Category</TableHead>
-                  <TableHead>Contact Person</TableHead>
-                  <TableHead>Location</TableHead>
-                  <TableHead>Rating</TableHead>
-                  <TableHead>Bookings</TableHead>
-                  <TableHead>Completion Rate</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Action</TableHead>
+                <TableRow className="bg-gray-50/60">
+                  <TableHead className="text-xs">Provider ID</TableHead>
+                  <TableHead className="text-xs">Business Name</TableHead>
+                  <TableHead className="text-xs">Category</TableHead>
+                  <TableHead className="text-xs">Contact Person</TableHead>
+                  <TableHead className="text-xs">Location</TableHead>
+                  <TableHead className="text-xs">Rating</TableHead>
+                  <TableHead className="text-xs">Bookings</TableHead>
+                  <TableHead className="text-xs">Completion</TableHead>
+                  <TableHead className="text-xs">Status</TableHead>
+                  <TableHead className="text-xs">Action</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredProviders.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={10} className="text-center py-8 text-gray-500">
+                    <TableCell colSpan={10} className="text-center py-10 text-gray-400 text-sm">
                       No service providers found
                     </TableCell>
                   </TableRow>
                 ) : (
                   filteredProviders.map((provider) => (
-                    <TableRow key={provider.id}>
+                    <TableRow key={provider.id} className="hover:bg-gray-50/50">
                       <TableCell>
-                        <span className="font-mono font-semibold text-[#16A34A]">
+                        <span className="font-mono font-semibold text-[#16A34A] text-sm">
                           {provider.id}
                         </span>
                       </TableCell>
                       <TableCell>
-                        <span className="font-medium text-gray-900">
+                        <span className="font-semibold text-gray-900 text-sm">
                           {provider.businessName}
                         </span>
                       </TableCell>
                       <TableCell>
-                        <span className="text-sm text-gray-600">
+                        <span className="text-xs text-gray-600">
                           {getCategoryById(provider.categoryId)?.name || "N/A"}
                         </span>
                       </TableCell>
@@ -237,20 +237,20 @@ export function ServiceProviders() {
                           <p className="text-sm font-medium text-gray-900">
                             {provider.contactPerson}
                           </p>
-                          <p className="text-xs text-gray-500">{provider.email}</p>
+                          <p className="text-xs text-gray-400">{provider.email}</p>
                         </div>
                       </TableCell>
                       <TableCell>
-                        <span className="text-sm text-gray-600">{provider.location}</span>
+                        <span className="text-xs text-gray-600">{provider.location}</span>
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1">
-                          <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
-                          <span className="font-semibold text-gray-900">{provider.rating}</span>
+                          <Star className="w-3.5 h-3.5 text-yellow-500 fill-yellow-500" />
+                          <span className="font-semibold text-gray-900 text-sm">{provider.rating}</span>
                         </div>
                       </TableCell>
                       <TableCell>
-                        <span className="font-semibold text-gray-900">
+                        <span className="font-semibold text-gray-900 text-sm">
                           {provider.totalBookings}
                         </span>
                       </TableCell>
@@ -258,10 +258,10 @@ export function ServiceProviders() {
                         <Badge
                           className={
                             provider.completionRate >= 95
-                              ? "bg-[#DCFCE7] text-[#15803D] border-[#BBF7D0]"
+                              ? "bg-[#DCFCE7] text-[#15803D] border-[#BBF7D0] text-xs"
                               : provider.completionRate >= 85
-                              ? "bg-yellow-100 text-yellow-700 border-yellow-200"
-                              : "bg-red-100 text-red-700 border-red-200"
+                              ? "bg-yellow-50 text-yellow-700 border-yellow-200 text-xs"
+                              : "bg-red-50 text-red-700 border-red-200 text-xs"
                           }
                         >
                           {provider.completionRate}%
@@ -272,7 +272,7 @@ export function ServiceProviders() {
                         <Button
                           size="sm"
                           onClick={() => navigate(`/service-providers/${provider.id}`)}
-                          className="bg-[#16A34A] hover:bg-[#15803D]"
+                          className="bg-[#16A34A] hover:bg-[#15803D] text-xs h-8 px-3"
                         >
                           View Details
                         </Button>

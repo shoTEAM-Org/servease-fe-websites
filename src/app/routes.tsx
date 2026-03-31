@@ -26,6 +26,8 @@ import { AddAdmin } from "./pages/AddAdmin";
 import { AdminProfile } from "./pages/AdminProfile";
 import { Customers } from "./pages/PlaceholderPages";
 import { Integrations } from "./pages/Integrations";
+import { ProviderApplicationReview } from "./pages/ProviderApplicationReview";
+import { ServiceProviderDetails } from "./pages/ServiceProviderDetails";
 
 export const router = createBrowserRouter([
   {
@@ -38,8 +40,9 @@ export const router = createBrowserRouter([
       // User Management
       { path: "customers", Component: Customers },
       { path: "service-providers", Component: ServiceProviders },
-      { path: "service-providers/:id", Component: ServiceProviders },
+      { path: "service-providers/:id", Component: ServiceProviderDetails },
       { path: "approval-queue", Component: ApprovalQueue },
+      { path: "approval-queue/:id", Component: ProviderApplicationReview },
 
       // Operations
       { path: "bookings", Component: AllBookings },
