@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Plus, X, Save, Upload, Star, Edit2, GripVertical, Trash2 } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Plus, Save, Star, Edit2, GripVertical, Trash2 } from "lucide-react";
 import { ImageWithFallback } from "./figma/ImageWithFallback";
 import { useNavigate } from "react-router";
 import { useProviderData } from "../context/ProviderDataContext";
@@ -131,23 +131,38 @@ interface PortfolioItem {
 
 export function PortfolioManagementPage() {
   const navigate = useNavigate();
-  const { providerData, setProviderData } = useProviderData();
-  
+  const { providerData, setPortfolioItems: persistPortfolioItems } = useProviderData();
+
+  const mappedContextPortfolioItems = useMemo(
+    () =>
+      providerData.portfolioItems.map((item) => ({
+        id: item.id,
+        beforeImage: item.imageUrl,
+        afterImage: item.imageUrl,
+        description: item.description,
+        category: item.category,
+        date: new Date().toISOString().split("T")[0],
+        featured: item.featured,
+      })),
+    [providerData.portfolioItems]
+  );
+
   const [portfolioItems, setPortfolioItems] = useState<PortfolioItem[]>(
-    providerData.portfolioItems.map((item) => ({
-      id: item.id,
-      beforeImage: item.imageUrl,
-      afterImage: item.imageUrl,
-      description: item.description,
-      category: item.category,
-      date: new Date().toISOString().split("T")[0],
-      featured: item.featured,
-    })),
+    mappedContextPortfolioItems
   );
 
   const [draggedItem, setDraggedItem] = useState<string | null>(null);
   const [isReordering, setIsReordering] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+
+  useEffect(() => {
+    setPortfolioItems(mappedContextPortfolioItems);
+  }, [mappedContextPortfolioItems]);
+
+  const hasUnsavedChanges = useMemo(
+    () => JSON.stringify(portfolioItems) !== JSON.stringify(mappedContextPortfolioItems),
+    [portfolioItems, mappedContextPortfolioItems]
+  );
 
   const addNewProject = () => {
     const newItem: PortfolioItem = {
@@ -199,7 +214,21 @@ export function PortfolioManagementPage() {
   };
 
   const handleSaveOrder = () => {
-    console.log("Saving order...", portfolioItems);
+    setIsReordering(false);
+  };
+
+  const handleSaveChanges = () => {
+    persistPortfolioItems(
+      portfolioItems.map((item) => ({
+        id: item.id,
+        imageUrl: item.afterImage || item.beforeImage,
+        title: item.description,
+        description: item.description,
+        category: item.category,
+        featured: item.featured,
+      }))
+    );
+    setEditingId(null);
     setIsReordering(false);
   };
 
@@ -592,7 +621,7 @@ export function PortfolioManagementPage() {
       </div>
 
       {/* Sticky Footer - Only shows if changes were made */}
-      {(isReordering || editingId) && (
+      {hasUnsavedChanges && (
         <div style={styles.stickyFooter}>
           <button
             onClick={() => navigate("/provider/edit-profile")}
@@ -610,24 +639,7 @@ export function PortfolioManagementPage() {
             Cancel
           </button>
           <button
-            onClick={() => {
-              // Save portfolio items to context
-              setProviderData({
-                ...providerData,
-                portfolioItems: portfolioItems.map(item => ({
-                  id: item.id,
-                  imageUrl: item.afterImage || item.beforeImage,
-                  title: item.description,
-                  description: item.description,
-                  category: item.category,
-                  featured: item.featured,
-                })),
-              });
-              setEditingId(null);
-              setIsReordering(false);
-              // Navigate back to edit profile
-              navigate("/provider/edit-profile");
-            }}
+            onClick={handleSaveChanges}
             style={{
               ...styles.button,
               ...styles.primaryButton,
@@ -640,7 +652,7 @@ export function PortfolioManagementPage() {
             }}
           >
             <Save style={{ width: "18px", height: "18px" }} />
-            Save All Changes
+            Save Changes
           </button>
         </div>
       )}

@@ -231,6 +231,41 @@ export function ProviderEarningsDashboard() {
   const totalTips = 1340;
   const platformFees = 1868;
 
+  const handleDownloadStatement = () => {
+    const csvContent = [
+      ["Metric", "Value"].join(","),
+      `"Period","${selectedPeriod.toUpperCase()}"`,
+      `"Total Earnings","${totalEarnings}"`,
+      `"Pending Earnings","${pendingEarnings}"`,
+      `"Processing","${inProcessing}"`,
+      `"Paid Out","${paidOut}"`,
+      `"Completed Bookings","${completedBookings}"`,
+      `"Avg Booking Value","${avgBookingValue}"`,
+      `"Total Tips","${totalTips}"`,
+      `"Platform Fees","${platformFees}"`,
+      "",
+      "--- Earnings Trend ---",
+      "Date,Amount",
+      ...earningsTrendData.map(d => `"${d.date}",${d.amount}`),
+      "",
+      "--- Service Category ---",
+      "Category,Earnings",
+      ...serviceCategoryData.map(d => `"${d.name}",${d.value}`),
+    ].join("\n");
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement("a");
+    if (link.download !== undefined) {
+      const url = URL.createObjectURL(blob);
+      link.setAttribute("href", url);
+      link.setAttribute("download", `earnings_statement_${selectedPeriod}.csv`);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+  };
+
   return (
     <div style={styles.container}>
       <div style={styles.maxWidthContainer}>
@@ -541,7 +576,18 @@ export function ProviderEarningsDashboard() {
               <Wallet style={{ width: '20px', height: '20px' }} />
               <span>Request Payout</span>
             </Link>
-            <button style={{...styles.button, ...styles.secondaryButton}}>
+            <button 
+              style={{...styles.button, ...styles.secondaryButton, cursor: 'pointer'}}
+              onClick={handleDownloadStatement}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.borderColor = '#00BF63';
+                e.currentTarget.style.color = '#00BF63';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.borderColor = '#E5E7EB';
+                e.currentTarget.style.color = '#374151';
+              }}
+            >
               <Download style={{ width: '20px', height: '20px' }} />
               <span>Download Statement</span>
             </button>

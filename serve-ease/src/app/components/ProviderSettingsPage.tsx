@@ -1,6 +1,6 @@
-import { useState } from "react";
-import { User, Bell, Lock, Shield, Eye, EyeOff, ChevronRight, CreditCard, MapPin, Clock, DollarSign, Settings as SettingsIcon, Moon, Sun, HelpCircle, FileText, Users, LogOut, Smartphone, Mail } from "lucide-react";
-import { Link } from "react-router";
+import { useState, useEffect } from "react";
+import { User, Bell, Lock, Shield, Eye, EyeOff, ChevronRight, CreditCard, MapPin, Clock, DollarSign, Settings as SettingsIcon, Moon, Sun, HelpCircle, FileText, Users, LogOut, Mail, Trash2 } from "lucide-react";
+import { Link, useNavigate } from "react-router";
 
 const styles = {
   container: {
@@ -134,13 +134,33 @@ const styles = {
 };
 
 export function ProviderSettingsPage() {
+  const navigate = useNavigate();
   const [pushNotifications, setPushNotifications] = useState(true);
   const [smsNotifications, setSmsNotifications] = useState(false);
   const [emailNotifications, setEmailNotifications] = useState(true);
   const [twoFactorAuth, setTwoFactorAuth] = useState(false);
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
-  const [theme, setTheme] = useState<'light' | 'dark'>('light');
+  const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+
+  // Initialize theme from localStorage or default to light, safely checking for window (SSR)
+  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
+    if (typeof window !== "undefined") {
+      return (localStorage.getItem('servease-theme') as 'light' | 'dark') || 'light';
+    }
+    return 'light';
+  });
+
+  // Apply dark mode filter globally and persist to localStorage
+  useEffect(() => {
+    localStorage.setItem('servease-theme', theme);
+    if (theme === 'dark') {
+      document.documentElement.classList.add('dark-mode');
+    } else {
+      document.documentElement.classList.remove('dark-mode');
+    }
+  }, [theme]);
 
   return (
     <div style={styles.container}>
@@ -562,7 +582,17 @@ export function ProviderSettingsPage() {
                 <label style={styles.label}>Language</label>
                 <select
                   defaultValue="en"
-                  style={{ ...styles.input, cursor: "pointer" }}
+                  style={{
+                    ...styles.input,
+                    cursor: "pointer",
+                    appearance: "none",
+                    WebkitAppearance: "none",
+                    backgroundImage: `url('data:image/svg+xml;utf8,<svg fill="none" stroke="%236B7280" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M6 9l6 6 6-6"></path></svg>')`,
+                    backgroundRepeat: "no-repeat",
+                    backgroundPosition: "right 14px center",
+                    backgroundSize: "16px",
+                    paddingRight: "40px",
+                  }}
                   onFocus={(e) => {
                     e.currentTarget.style.borderColor = "#00BF63";
                   }}
@@ -581,7 +611,17 @@ export function ProviderSettingsPage() {
                 <label style={styles.label}>Currency</label>
                 <select
                   defaultValue="php"
-                  style={{ ...styles.input, cursor: "pointer" }}
+                  style={{
+                    ...styles.input,
+                    cursor: "pointer",
+                    appearance: "none",
+                    WebkitAppearance: "none",
+                    backgroundImage: `url('data:image/svg+xml;utf8,<svg fill="none" stroke="%236B7280" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M6 9l6 6 6-6"></path></svg>')`,
+                    backgroundRepeat: "no-repeat",
+                    backgroundPosition: "right 14px center",
+                    backgroundSize: "16px",
+                    paddingRight: "40px",
+                  }}
                   onFocus={(e) => {
                     e.currentTarget.style.borderColor = "#00BF63";
                   }}
@@ -600,7 +640,17 @@ export function ProviderSettingsPage() {
                 <label style={styles.label}>Distance Unit</label>
                 <select
                   defaultValue="km"
-                  style={{ ...styles.input, cursor: "pointer" }}
+                  style={{
+                    ...styles.input,
+                    cursor: "pointer",
+                    appearance: "none",
+                    WebkitAppearance: "none",
+                    backgroundImage: `url('data:image/svg+xml;utf8,<svg fill="none" stroke="%236B7280" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M6 9l6 6 6-6"></path></svg>')`,
+                    backgroundRepeat: "no-repeat",
+                    backgroundPosition: "right 14px center",
+                    backgroundSize: "16px",
+                    paddingRight: "40px",
+                  }}
                   onFocus={(e) => {
                     e.currentTarget.style.borderColor = "#00BF63";
                   }}
@@ -673,7 +723,7 @@ export function ProviderSettingsPage() {
             <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
               <div
                 style={styles.linkItem}
-                onClick={() => alert("View Provider Agreement")}
+                onClick={() => navigate("/provider-agreement")}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.backgroundColor = "#F0FDF4";
                   e.currentTarget.style.borderColor = "#00BF63";
@@ -692,7 +742,7 @@ export function ProviderSettingsPage() {
 
               <div
                 style={styles.linkItem}
-                onClick={() => alert("View Terms & Conditions")}
+                onClick={() => navigate("/terms-and-conditions")}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.backgroundColor = "#F0FDF4";
                   e.currentTarget.style.borderColor = "#00BF63";
@@ -711,7 +761,7 @@ export function ProviderSettingsPage() {
 
               <div
                 style={{ ...styles.linkItem, marginBottom: "0" }}
-                onClick={() => alert("View Privacy Policy")}
+                onClick={() => navigate("/privacy-policy")}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.backgroundColor = "#F0FDF4";
                   e.currentTarget.style.borderColor = "#00BF63";
@@ -759,7 +809,7 @@ export function ProviderSettingsPage() {
 
               <div
                 style={styles.linkItem}
-                onClick={() => alert("Contact Support")}
+                onClick={() => navigate("/provider/contact-support")}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.backgroundColor = "#F0FDF4";
                   e.currentTarget.style.borderColor = "#00BF63";
@@ -778,7 +828,7 @@ export function ProviderSettingsPage() {
 
               <div
                 style={{ ...styles.linkItem, marginBottom: "0" }}
-                onClick={() => alert("Provider Community")}
+                onClick={() => navigate("/provider/community")}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.backgroundColor = "#F0FDF4";
                   e.currentTarget.style.borderColor = "#00BF63";
@@ -801,50 +851,41 @@ export function ProviderSettingsPage() {
         {/* Row 4: Log Out and Danger Zone */}
         <div style={styles.gridTwoCol}>
           {/* Log Out Button */}
-          <div style={styles.card}>
-            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '200px' }}>
-              <button
-                style={{
-                  ...styles.button,
-                  backgroundColor: "white",
-                  color: "#6B7280",
-                  border: "2px solid #E5E7EB",
-                  fontSize: "16px",
-                  padding: "14px 24px",
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = "#F9FAFB";
-                  e.currentTarget.style.borderColor = "#D1D5DB";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = "white";
-                  e.currentTarget.style.borderColor = "#E5E7EB";
-                }}
-                onClick={() => alert("Log out")}
-              >
-                <LogOut style={{ width: "20px", height: "20px" }} />
-                Log Out
-              </button>
+          <div style={{ ...styles.card, display: "flex", justifyContent: "space-between", alignItems: "center", padding: "24px" }}>
+            <div>
+              <h3 style={{ fontSize: "16px", fontWeight: "bold", color: "#111827", marginBottom: "4px" }}>Log Out</h3>
+              <p style={{ fontSize: "14px", color: "#6B7280", margin: 0 }}>Sign out of your account on this device</p>
             </div>
+            <button
+              style={{
+                ...styles.button,
+                backgroundColor: "white",
+                color: "#6B7280",
+                border: "1px solid #E5E7EB",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = "#F9FAFB";
+                e.currentTarget.style.borderColor = "#D1D5DB";
+                e.currentTarget.style.color = "#111827";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = "white";
+                e.currentTarget.style.borderColor = "#E5E7EB";
+                e.currentTarget.style.color = "#6B7280";
+              }}
+              onClick={() => setIsLogoutModalOpen(true)}
+            >
+              <LogOut style={{ width: "18px", height: "18px" }} />
+              Log Out
+            </button>
           </div>
 
           {/* Danger Zone */}
-          <div
-            style={{
-              ...styles.card,
-              borderColor: "#FCA5A5",
-              backgroundColor: "#FEF2F2",
-            }}
-          >
-            <div style={styles.sectionTitle}>
-              <Shield style={{ width: "22px", height: "22px", color: "#DC2626" }} />
-              <span style={{ color: "#DC2626" }}>Danger Zone</span>
+          <div style={{ ...styles.card, borderColor: "#FCA5A5", backgroundColor: "#FEF2F2", display: "flex", justifyContent: "space-between", alignItems: "center", padding: "24px" }}>
+            <div>
+              <h3 style={{ fontSize: "16px", fontWeight: "bold", color: "#DC2626", marginBottom: "4px" }}>Delete Account</h3>
+              <p style={{ fontSize: "14px", color: "#DC2626", margin: 0 }}>Permanently remove your account</p>
             </div>
-
-            <p style={{ fontSize: "14px", color: "#6B7280", marginBottom: "16px" }}>
-              Once you delete your account, there is no going back. Please be certain.
-            </p>
-
             <button
               style={{
                 ...styles.button,
@@ -857,17 +898,227 @@ export function ProviderSettingsPage() {
               onMouseLeave={(e) => {
                 e.currentTarget.style.backgroundColor = "#DC2626";
               }}
-              onClick={() => {
-                if (confirm("Are you sure you want to delete your account? This action cannot be undone.")) {
-                  alert("Account deletion initiated");
-                }
-              }}
+              onClick={() => setIsDeleteModalOpen(true)}
             >
               Delete Account
             </button>
           </div>
         </div>
       </div>
+
+      {/* Logout Modal */}
+      {isLogoutModalOpen && (
+        <div style={{
+          position: "fixed",
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: "rgba(0, 0, 0, 0.5)",
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          zIndex: 1000,
+        }}>
+          <div style={{
+            backgroundColor: theme === 'dark' ? "#1F2937" : "white",
+            padding: "32px",
+            borderRadius: "16px",
+            maxWidth: "400px",
+            width: "90%",
+            boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)",
+            textAlign: "center"
+          }}>
+            <div style={{
+              width: "64px",
+              height: "64px",
+              backgroundColor: "#FEF2F2",
+              borderRadius: "50%",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              margin: "0 auto 24px"
+            }}>
+              <LogOut style={{ width: "32px", height: "32px", color: "#EF4444" }} />
+            </div>
+
+            <h2 style={{
+              fontSize: "24px",
+              fontWeight: "700",
+              color: theme === 'dark' ? "white" : "#111827",
+              marginBottom: "12px"
+            }}>
+              Log Out
+            </h2>
+
+            <p style={{
+              fontSize: "15px",
+              color: theme === 'dark' ? "#9CA3AF" : "#6B7280",
+              marginBottom: "32px",
+              lineHeight: "1.5"
+            }}>
+              Are you sure you want to log out?
+            </p>
+
+            <div style={{
+              display: "flex",
+              gap: "16px"
+            }}>
+              <button
+                style={{
+                  ...styles.button,
+                  flex: 1,
+                  backgroundColor: theme === 'dark' ? "#374151" : "white",
+                  color: theme === 'dark' ? "#D1D5DB" : "#4B5563",
+                  border: `1px solid ${theme === 'dark' ? "#4B5563" : "#D1D5DB"}`,
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = theme === 'dark' ? "#4B5563" : "#F3F4F6";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = theme === 'dark' ? "#374151" : "white";
+                }}
+                onClick={() => setIsLogoutModalOpen(false)}
+              >
+                Cancel
+              </button>
+
+              <button
+                style={{
+                  ...styles.button,
+                  flex: 1,
+                  backgroundColor: "#EF4444",
+                  color: "white",
+                  boxShadow: "0 4px 12px rgba(239, 68, 68, 0.25)",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = "#DC2626";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = "#EF4444";
+                }}
+                onClick={() => {
+                  setIsLogoutModalOpen(false);
+                  navigate('/login');
+                }}
+              >
+                Log Out
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Account Modal */}
+      {isDeleteModalOpen && (
+        <div style={{
+          position: "fixed",
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: "rgba(0, 0, 0, 0.5)",
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          zIndex: 1000,
+        }}>
+          <div style={{
+            backgroundColor: theme === 'dark' ? "#1F2937" : "white",
+            padding: "32px",
+            borderRadius: "16px",
+            maxWidth: "400px",
+            width: "90%",
+            boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)",
+            textAlign: "center"
+          }}>
+            <div style={{
+              width: "64px",
+              height: "64px",
+              backgroundColor: "#FEF2F2",
+              borderRadius: "50%",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              margin: "0 auto 24px"
+            }}>
+              <Trash2 style={{ width: "32px", height: "32px", color: "#EF4444" }} />
+            </div>
+
+            <h2 style={{
+              fontSize: "24px",
+              fontWeight: "700",
+              color: theme === 'dark' ? "white" : "#111827",
+              marginBottom: "12px"
+            }}>
+              Delete Account
+            </h2>
+
+            <p style={{
+              fontSize: "15px",
+              color: theme === 'dark' ? "#9CA3AF" : "#6B7280",
+              marginBottom: "8px",
+              lineHeight: "1.5"
+            }}>
+              Are you sure you want to delete your account?
+            </p>
+            <p style={{
+              fontSize: "14px",
+              color: theme === 'dark' ? "#9CA3AF" : "#6B7280",
+              marginBottom: "32px",
+              lineHeight: "1.5",
+            }}>
+              This action cannot be undone.
+            </p>
+
+            <div style={{
+              display: "flex",
+              gap: "16px"
+            }}>
+              <button
+                style={{
+                  ...styles.button,
+                  flex: 1,
+                  backgroundColor: theme === 'dark' ? "#374151" : "white",
+                  color: theme === 'dark' ? "#D1D5DB" : "#4B5563",
+                  border: `1px solid ${theme === 'dark' ? "#4B5563" : "#D1D5DB"}`,
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = theme === 'dark' ? "#4B5563" : "#F3F4F6";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = theme === 'dark' ? "#374151" : "white";
+                }}
+                onClick={() => setIsDeleteModalOpen(false)}
+              >
+                Cancel
+              </button>
+
+              <button
+                style={{
+                  ...styles.button,
+                  flex: 1,
+                  backgroundColor: "#DC2626",
+                  color: "white",
+                  boxShadow: "0 4px 12px rgba(220, 38, 38, 0.25)",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = "#B91C1C";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = "#DC2626";
+                }}
+                onClick={() => {
+                  setIsDeleteModalOpen(false);
+                  alert("Account deletion initiated");
+                }}
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

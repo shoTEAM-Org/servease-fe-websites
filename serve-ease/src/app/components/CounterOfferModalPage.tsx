@@ -5,10 +5,10 @@ import {
   Calendar,
   Clock,
   DollarSign,
-  FileText,
+
   User,
   Briefcase,
-  X,
+
 } from "lucide-react";
 
 const styles = {
@@ -245,7 +245,7 @@ const styles = {
 };
 
 export function CounterOfferModalPage() {
-  const { id } = useParams();
+//   const { id } = useParams();
   const navigate = useNavigate();
 
   // Original booking data

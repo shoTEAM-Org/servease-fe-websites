@@ -1,3 +1,16 @@
 @import './fonts.css';
 @import './tailwind.css';
 @import './theme.css';
+
+/* Global Dark Mode (Inversion fallback for inline-styled apps) */
+.dark-mode {
+  filter: invert(1) hue-rotate(180deg);
+  background-color: #111;
+}
+
+.dark-mode img,
+.dark-mode svg,
+.dark-mode video,
+.dark-mode [style*="background-image"] {
+  filter: invert(1) hue-rotate(180deg);
+}

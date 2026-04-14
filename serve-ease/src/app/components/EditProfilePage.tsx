@@ -123,13 +123,16 @@ export function EditProfilePage() {
   const [yearsExperience, setYearsExperience] = useState(profile.yearsExperience);
   const [languages, setLanguages] = useState<string[]>(profile.languages);
   const [showLanguageDropdown, setShowLanguageDropdown] = useState(false);
-  const [licenses, setLicenses] = useState<License[]>([
-    { type: "Professional Cleaning License", number: "PCL-2018-001234", expiry: "2026-12-31" },
-  ]);
-  const [certifications, setCertifications] = useState<Certification[]>([
-    { name: "Professional Cleaning Certification - ISSA" },
-    { name: "Green Cleaning Specialist" },
-  ]);
+  const [licenses, setLicenses] = useState<License[]>(
+    profile.licenses?.length
+      ? profile.licenses
+      : [{ type: "Professional Cleaning License", number: "PCL-2018-001234", expiry: "2026-12-31" }]
+  );
+  const [certifications, setCertifications] = useState<Certification[]>(
+    profile.certifications?.length
+      ? profile.certifications.map((name) => ({ name }))
+      : [{ name: "Professional Cleaning Certification - ISSA" }, { name: "Green Cleaning Specialist" }]
+  );
   const [facebook, setFacebook] = useState(profile.facebook);
   const [instagram, setInstagram] = useState(profile.instagram);
   const [website, setWebsite] = useState(profile.website);
@@ -167,7 +170,6 @@ export function EditProfilePage() {
       if (file) {
         const url = URL.createObjectURL(file);
         setCoverPhotoUrl(url);
-        updateProfile({ coverPhotoUrl: url });
       }
     };
     input.click();
@@ -182,7 +184,6 @@ export function EditProfilePage() {
       if (file) {
         const url = URL.createObjectURL(file);
         setProfilePhotoUrl(url);
-        updateProfile({ profilePhotoUrl: url });
       }
     };
     input.click();
@@ -224,9 +225,15 @@ export function EditProfilePage() {
       serviceAreas,
       yearsExperience,
       languages,
+      licenses,
+      certifications: certifications
+        .map((cert) => cert.name.trim())
+        .filter((name) => name.length > 0),
       facebook,
       instagram,
       website,
+      coverPhotoUrl,
+      profilePhotoUrl,
     });
     
     // Navigate back to profile
@@ -843,7 +850,11 @@ export function EditProfilePage() {
               </p>
             </div>
             <button
-              onClick={() => navigate("/provider/edit-services")}
+              onClick={() =>
+                navigate("/provider/edit-services?from=edit-profile", {
+                  state: { from: "edit-profile" },
+                })
+              }
               style={{
                 ...styles.button,
                 ...styles.primaryButton,

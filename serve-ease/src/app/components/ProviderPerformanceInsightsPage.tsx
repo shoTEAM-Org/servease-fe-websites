@@ -107,10 +107,10 @@ export function ProviderPerformanceInsightsPage() {
     cursor: 'default'
   };
 
-  const cardHoverStyle: React.CSSProperties = {
-    ...cardStyle,
-    boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
-  };
+//   const cardHoverStyle: React.CSSProperties = {
+//     ...cardStyle,
+//     boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
+//   };
 
   const sectionTitleStyle: React.CSSProperties = {
     fontSize: '24px',
@@ -122,12 +122,12 @@ export function ProviderPerformanceInsightsPage() {
     gap: '8px'
   };
 
-  const accentBarStyle: React.CSSProperties = {
-    height: '4px',
-    width: '32px',
-    background: '#00BF63',
-    borderRadius: '4px'
-  };
+//   const accentBarStyle: React.CSSProperties = {
+//     height: '4px',
+//     width: '32px',
+//     background: '#00BF63',
+//     borderRadius: '4px'
+//   };
 
   // Top row grid
   const topRowStyle: React.CSSProperties = {

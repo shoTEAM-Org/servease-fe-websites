@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Clock, X, DollarSign, Users, CheckCircle, XCircle, MinusCircle } from "lucide-react";
+import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Clock, X, DollarSign, CheckCircle, XCircle, MinusCircle } from "lucide-react";
 import { useNavigate } from "react-router";
 import { useProviderData } from "../context/ProviderDataContext";
 
@@ -62,9 +62,16 @@ interface Booking {
   customer: string;
 }
 
+interface PersonalEvent {
+  id: string;
+  date: string;
+  title: string;
+  time: string;
+}
+
 export function CalendarPage() {
   const navigate = useNavigate();
-  const { blockedDates, providerData } = useProviderData();
+  const { blockedDates, providerData, addPersonalEvent } = useProviderData();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [view, setView] = useState<"Month" | "Week" | "Day">("Month");
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
@@ -115,6 +122,63 @@ const formatDate = (date: Date) => {
   return `${year}-${month}-${day}`;
 };
 
+  const format24HourTime = (time: string) => {
+    if (!time || !time.includes(":")) {
+      return "Not set";
+    }
+
+    const [hoursRaw, minutesRaw] = time.split(":").map(Number);
+    if (Number.isNaN(hoursRaw) || Number.isNaN(minutesRaw)) {
+      return "Not set";
+    }
+
+    const isPm = hoursRaw >= 12;
+    const hour12 = hoursRaw % 12 || 12;
+    const minutes = String(minutesRaw).padStart(2, "0");
+    return `${hour12}:${minutes} ${isPm ? "PM" : "AM"}`;
+  };
+
+  const toMinutes = (timeLabel: string) => {
+    if (timeLabel.includes(":")) {
+      if (timeLabel.includes("AM") || timeLabel.includes("PM")) {
+        const [timePart, period] = timeLabel.split(" ");
+        const [hourPart, minutePart] = timePart.split(":").map(Number);
+        let normalizedHour = hourPart;
+
+        if (period === "PM" && normalizedHour !== 12) {
+          normalizedHour += 12;
+        }
+        if (period === "AM" && normalizedHour === 12) {
+          normalizedHour = 0;
+        }
+
+        return normalizedHour * 60 + minutePart;
+      }
+
+      const [hourPart, minutePart] = timeLabel.split(":").map(Number);
+      return hourPart * 60 + minutePart;
+    }
+
+    return 0;
+  };
+
+  const findPersonalEventForSlot = (events: PersonalEvent[], slot: string) => {
+    const slotMinutes = toMinutes(slot);
+    return events.find((event) => {
+      const eventMinutes = toMinutes(event.time);
+      return eventMinutes >= slotMinutes && eventMinutes < slotMinutes + 60;
+    });
+  };
+
+  const personalEventsByDate = providerData.personalEvents.reduce<Record<string, PersonalEvent[]>>(
+    (accumulator, event) => {
+      const existing = accumulator[event.date] ?? [];
+      accumulator[event.date] = [...existing, event];
+      return accumulator;
+    },
+    {}
+  );
+
   const isToday = (day: number) => {
     const today = new Date();
     return (
@@ -129,17 +193,17 @@ const formatDate = (date: Date) => {
     return formatDate(date) === formatDate(today);
   };
 
-  const hasBooking = (day: number) => {
-    const dateStr = formatDate(
-      new Date(currentDate.getFullYear(), currentDate.getMonth(), day)
-    );
-    return bookings[dateStr] && bookings[dateStr].length > 0;
-  };
+//   const hasBooking = (day: number) => {
+//     const dateStr = formatDate(
+//       new Date(currentDate.getFullYear(), currentDate.getMonth(), day)
+//     );
+//     return bookings[dateStr] && bookings[dateStr].length > 0;
+//   };
 
-  const hasBookingDate = (date: Date) => {
-    const dateStr = formatDate(date);
-    return bookings[dateStr] && bookings[dateStr].length > 0;
-  };
+//   const hasBookingDate = (date: Date) => {
+//     const dateStr = formatDate(date);
+//     return bookings[dateStr] && bookings[dateStr].length > 0;
+//   };
 
   const isBlocked = (day: number) => {
     const dateStr = formatDate(
@@ -220,7 +284,18 @@ const isAvailable = (day: number) => {
   };
 
   const handleAddEvent = () => {
-    // Handle event creation
+    if (!selectedDate || !eventTitle.trim() || !eventTime) {
+      return;
+    }
+
+    const newEvent: PersonalEvent = {
+      id: `${Date.now()}`,
+      date: formatDate(selectedDate),
+      title: eventTitle.trim(),
+      time: eventTime,
+    };
+
+    addPersonalEvent(newEvent);
     setShowEventModal(false);
     setEventTitle("");
     setEventTime("");
@@ -232,6 +307,27 @@ const isAvailable = (day: number) => {
 
   const selectedDateStr = selectedDate ? formatDate(selectedDate) : "";
   const selectedBookings = selectedDateStr ? bookings[selectedDateStr] || [] : [];
+  const selectedPersonalEvents = selectedDateStr ? personalEventsByDate[selectedDateStr] || [] : [];
+  const selectedDayName = selectedDate
+    ? selectedDate.toLocaleDateString("en-US", { weekday: "long" })
+    : null;
+  const selectedDaySchedule = selectedDayName
+    ? providerData.availability[selectedDayName]
+    : null;
+  const selectedDayIsAvailable = selectedDaySchedule
+    ? selectedDaySchedule.available
+    : true;
+
+  const selectedDayWorkingHoursText = selectedDaySchedule
+    ? `${format24HourTime(selectedDaySchedule.startTime)} - ${format24HourTime(selectedDaySchedule.endTime)}`
+    : "Not set";
+
+  const selectedDayHasBreak = Boolean(
+    selectedDaySchedule?.breakStart && selectedDaySchedule?.breakEnd
+  );
+  const selectedDayBreakText = selectedDayHasBreak
+    ? `Break: ${format24HourTime(selectedDaySchedule?.breakStart ?? "")} - ${format24HourTime(selectedDaySchedule?.breakEnd ?? "")}`
+    : "Break: None";
 
   const timeSlots = [
     "8:00 AM", "9:00 AM", "10:00 AM", "11:00 AM", "12:00 PM",
@@ -437,6 +533,8 @@ const isAvailable = (day: number) => {
                       );
                       const dayBookings = bookings[dateStr] || [];
                       const hasBookingToday = dayBookings.length > 0;
+                      const personalEventsToday = personalEventsByDate[dateStr] || [];
+                      const hasPersonalEventsToday = personalEventsToday.length > 0;
                       const bookingCount = dayBookings.length;
                       const dayEarnings = dayBookings.length * 1500; // Mock earnings
                       const isBlockedToday = isBlocked(day);
@@ -464,8 +562,10 @@ const isAvailable = (day: number) => {
                               ? "#FEE2E2"
                               : isSelected
                               ? "#E0F2FE"
-                              : isAvailableToday && !hasBookingToday
+                              : isAvailableToday && !hasBookingToday && !hasPersonalEventsToday
                               ? "#F0FDF8"
+                              : hasPersonalEventsToday
+                              ? "#FFF7ED"
                               : "white",
                             transition: "all 0.3s ease",
                             position: "relative",
@@ -479,8 +579,10 @@ const isAvailable = (day: number) => {
                             if (!isSelected) {
                               e.currentTarget.style.backgroundColor = isBlockedToday
                                 ? "#FEE2E2"
-                                : isAvailableToday && !hasBookingToday
+                                : isAvailableToday && !hasBookingToday && !hasPersonalEventsToday
                                 ? "#F0FDF8"
+                                : hasPersonalEventsToday
+                                ? "#FFF7ED"
                                 : "white";
                             }
                           }}
@@ -523,6 +625,29 @@ const isAvailable = (day: number) => {
                                 }}
                               >
                                 ₱{dayEarnings}
+                              </div>
+                            </>
+                          )}
+                          {!hasBookingToday && hasPersonalEventsToday && (
+                            <>
+                              <div
+                                style={{
+                                  width: "6px",
+                                  height: "6px",
+                                  borderRadius: "50%",
+                                  backgroundColor: "#F97316",
+                                  marginTop: "4px",
+                                }}
+                              />
+                              <div
+                                style={{
+                                  fontSize: "9px",
+                                  color: "#9A3412",
+                                  fontWeight: "600",
+                                  marginTop: "2px",
+                                }}
+                              >
+                                {personalEventsToday.length} event{personalEventsToday.length > 1 ? "s" : ""}
                               </div>
                             </>
                           )}
@@ -653,6 +778,8 @@ const isAvailable = (day: number) => {
                           const dateStr = formatDate(day);
                           const dayBookings = bookings[dateStr] || [];
                           const slotBooking = dayBookings.find(b => b.time === slot);
+                          const dayPersonalEvents = personalEventsByDate[dateStr] || [];
+                          const slotPersonalEvent = findPersonalEventForSlot(dayPersonalEvents, slot);
                           
                           return (
                             <div
@@ -662,21 +789,26 @@ const isAvailable = (day: number) => {
                                 minHeight: "60px",
                                 border: "1px solid #E5E7EB",
                                 borderRadius: "8px",
-                                backgroundColor: slotBooking ? "#DBEAFE" : "white",
+                                backgroundColor: slotBooking ? "#DBEAFE" : slotPersonalEvent ? "#FFF7ED" : "white",
                                 cursor: "pointer",
                                 padding: "4px",
                                 transition: "all 0.2s ease",
                               }}
                               onMouseEnter={(e) => {
-                                if (!slotBooking) e.currentTarget.style.backgroundColor = "#F9FAFB";
+                                if (!slotBooking && !slotPersonalEvent) e.currentTarget.style.backgroundColor = "#F9FAFB";
                               }}
                               onMouseLeave={(e) => {
-                                if (!slotBooking) e.currentTarget.style.backgroundColor = "white";
+                                if (!slotBooking && !slotPersonalEvent) e.currentTarget.style.backgroundColor = "white";
                               }}
                             >
                               {slotBooking && (
                                 <div style={{ fontSize: "11px", fontWeight: "600", color: "#1E40AF" }}>
                                   {slotBooking.service}
+                                </div>
+                              )}
+                              {!slotBooking && slotPersonalEvent && (
+                                <div style={{ fontSize: "11px", fontWeight: "600", color: "#9A3412" }}>
+                                  {slotPersonalEvent.title}
                                 </div>
                               )}
                             </div>
@@ -724,6 +856,8 @@ const isAvailable = (day: number) => {
                       const dateStr = formatDate(currentDate);
                       const dayBookings = bookings[dateStr] || [];
                       const slotBooking = dayBookings.find(b => b.time === slot);
+                      const dayPersonalEvents = personalEventsByDate[dateStr] || [];
+                      const slotPersonalEvent = findPersonalEventForSlot(dayPersonalEvents, slot);
 
                       return (
                         <div
@@ -745,16 +879,16 @@ const isAvailable = (day: number) => {
                               minHeight: "80px",
                               border: slotBooking ? "2px solid #3B82F6" : "1px solid #E5E7EB",
                               borderRadius: "12px",
-                              backgroundColor: slotBooking ? "#EFF6FF" : "white",
+                              backgroundColor: slotBooking ? "#EFF6FF" : slotPersonalEvent ? "#FFF7ED" : "white",
                               cursor: "pointer",
                               padding: "12px",
                               transition: "all 0.2s ease",
                             }}
                             onMouseEnter={(e) => {
-                              if (!slotBooking) e.currentTarget.style.backgroundColor = "#F9FAFB";
+                              if (!slotBooking && !slotPersonalEvent) e.currentTarget.style.backgroundColor = "#F9FAFB";
                             }}
                             onMouseLeave={(e) => {
-                              if (!slotBooking) e.currentTarget.style.backgroundColor = "white";
+                              if (!slotBooking && !slotPersonalEvent) e.currentTarget.style.backgroundColor = "white";
                             }}
                           >
                             {slotBooking ? (
@@ -764,6 +898,15 @@ const isAvailable = (day: number) => {
                                 </div>
                                 <div style={{ fontSize: "14px", color: "#6B7280" }}>
                                   Customer: {slotBooking.customer}
+                                </div>
+                              </div>
+                            ) : slotPersonalEvent ? (
+                              <div>
+                                <div style={{ fontSize: "16px", fontWeight: "bold", color: "#9A3412", marginBottom: "4px" }}>
+                                  {slotPersonalEvent.title}
+                                </div>
+                                <div style={{ fontSize: "14px", color: "#C2410C" }}>
+                                  Personal event at {format24HourTime(slotPersonalEvent.time)}
                                 </div>
                               </div>
                             ) : (
@@ -846,6 +989,11 @@ const isAvailable = (day: number) => {
                   </div>
                   <span>•</span>
                   <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                    <CalendarIcon size={14} color="#F97316" />
+                    {selectedPersonalEvents.length} Event{selectedPersonalEvents.length !== 1 ? "s" : ""}
+                  </div>
+                  <span>•</span>
+                  <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
                     <DollarSign size={14} color="#00BF63" />
                     ₱{selectedBookings.length * 1500}
                   </div>
@@ -925,18 +1073,67 @@ const isAvailable = (day: number) => {
                       textAlign: "center",
                       padding: "24px",
                       marginBottom: "20px",
-                      backgroundColor: "#F0FDF8",
+                      backgroundColor: selectedDayIsAvailable ? "#F0FDF8" : "#FEF2F2",
                       borderRadius: "12px",
-                      border: "1px solid #D1FAE5",
+                      border: selectedDayIsAvailable ? "1px solid #D1FAE5" : "1px solid #FECACA",
                     }}
                   >
-                    <CheckCircle size={32} color="#00BF63" style={{ margin: "0 auto 12px" }} />
+                    <CheckCircle
+                      size={32}
+                      color={selectedDayIsAvailable ? "#00BF63" : "#DC2626"}
+                      style={{ margin: "0 auto 12px" }}
+                    />
                     <p style={{ fontSize: "14px", fontWeight: "600", color: "#065F46", marginBottom: "4px" }}>
                       No bookings for this day
                     </p>
                     <p style={{ fontSize: "12px", color: "#6B7280" }}>
-                      You're fully available. You can accept new bookings.
+                      {selectedDayIsAvailable
+                        ? "You're fully available. You can accept new bookings."
+                        : "This day is marked unavailable in your set availability."}
                     </p>
+                  </div>
+                )}
+
+                {selectedPersonalEvents.length > 0 && (
+                  <div style={{ marginBottom: "20px" }}>
+                    <p
+                      style={{
+                        fontSize: "12px",
+                        fontWeight: "600",
+                        color: "#6B7280",
+                        textTransform: "uppercase",
+                        letterSpacing: "0.05em",
+                        marginBottom: "12px",
+                      }}
+                    >
+                      Personal Events
+                    </p>
+                    {selectedPersonalEvents.map((event) => (
+                      <div
+                        key={event.id}
+                        style={{
+                          backgroundColor: "#FFF7ED",
+                          border: "1px solid #FDBA74",
+                          borderRadius: "12px",
+                          padding: "12px",
+                          marginBottom: "8px",
+                        }}
+                      >
+                        <p
+                          style={{
+                            fontSize: "14px",
+                            fontWeight: "600",
+                            color: "#9A3412",
+                            marginBottom: "4px",
+                          }}
+                        >
+                          {event.title}
+                        </p>
+                        <p style={{ fontSize: "13px", color: "#C2410C" }}>
+                          {format24HourTime(event.time)}
+                        </p>
+                      </div>
+                    ))}
                   </div>
                 )}
 
@@ -957,10 +1154,10 @@ const isAvailable = (day: number) => {
                     </p>
                   </div>
                   <p style={{ fontSize: "12px", color: "#6B7280", marginBottom: "4px" }}>
-                    8:00 AM – 5:00 PM
+                    {selectedDayIsAvailable ? selectedDayWorkingHoursText : "Unavailable for bookings"}
                   </p>
                   <p style={{ fontSize: "11px", color: "#9CA3AF" }}>
-                    Break: 12:00 PM – 1:00 PM
+                    {selectedDayIsAvailable ? selectedDayBreakText : "Break: N/A"}
                   </p>
                 </div>
 
@@ -985,14 +1182,54 @@ const isAvailable = (day: number) => {
                       gap: "8px",
                     }}
                   >
-                    {timeSlots.slice(0, 8).map((slot, idx) => {
+                    {timeSlots.slice(0, 8).map((slot) => {
+                      const slotMinutes = toMinutes(slot);
                       const isBooked = selectedBookings.some(b => b.time === slot);
-                      const isBreak = slot === "12:00 PM";
-                      const StatusIcon = isBooked ? XCircle : isBreak ? MinusCircle : CheckCircle;
-                      const status = isBooked ? "Booked" : isBreak ? "Blocked" : "Available";
-                      const bgColor = isBooked ? "#EFF6FF" : isBreak ? "#FEE2E2" : "#F0FDF8";
-                      const borderColor = isBooked ? "#3B82F6" : isBreak ? "#FCA5A5" : "#A7F3D0";
-                      const textColor = isBooked ? "#1E40AF" : isBreak ? "#DC2626" : "#065F46";
+                      const slotHasPersonalEvent = selectedPersonalEvents.some((event) => {
+                        const eventMinutes = toMinutes(event.time);
+                        return eventMinutes >= slotMinutes && eventMinutes < slotMinutes + 60;
+                      });
+
+                      const hasBreakWindow = Boolean(
+                        selectedDaySchedule?.breakStart && selectedDaySchedule?.breakEnd
+                      );
+                      const breakStartMinutes = hasBreakWindow
+                        ? toMinutes(selectedDaySchedule?.breakStart ?? "")
+                        : -1;
+                      const breakEndMinutes = hasBreakWindow
+                        ? toMinutes(selectedDaySchedule?.breakEnd ?? "")
+                        : -1;
+
+                      const isBreak =
+                        selectedDayIsAvailable &&
+                        hasBreakWindow &&
+                        breakStartMinutes < breakEndMinutes &&
+                        slotMinutes >= breakStartMinutes &&
+                        slotMinutes < breakEndMinutes;
+
+                      const hasWorkingWindow = Boolean(
+                        selectedDaySchedule?.startTime && selectedDaySchedule?.endTime
+                      );
+                      const dayStartMinutes = hasWorkingWindow
+                        ? toMinutes(selectedDaySchedule?.startTime ?? "")
+                        : -1;
+                      const dayEndMinutes = hasWorkingWindow
+                        ? toMinutes(selectedDaySchedule?.endTime ?? "")
+                        : -1;
+
+                      const isOutsideWorkingHours =
+                        selectedDayIsAvailable &&
+                        hasWorkingWindow &&
+                        dayStartMinutes < dayEndMinutes &&
+                        (slotMinutes < dayStartMinutes || slotMinutes >= dayEndMinutes);
+
+                      const isBlocked = !selectedDayIsAvailable || isBreak || isOutsideWorkingHours || slotHasPersonalEvent;
+
+                      const StatusIcon = isBooked ? XCircle : isBlocked ? MinusCircle : CheckCircle;
+                      const status = isBooked ? "Booked" : isBlocked ? "Blocked" : "Available";
+                      const bgColor = isBooked ? "#EFF6FF" : isBlocked ? "#FEE2E2" : "#F0FDF8";
+                      const borderColor = isBooked ? "#3B82F6" : isBlocked ? "#FCA5A5" : "#A7F3D0";
+                      const textColor = isBooked ? "#1E40AF" : isBlocked ? "#DC2626" : "#065F46";
                       
                       return (
                         <div
@@ -1007,10 +1244,10 @@ const isAvailable = (day: number) => {
                             color: textColor,
                             textAlign: "center",
                             transition: "all 0.2s ease",
-                            cursor: !isBooked ? "pointer" : "default",
+                            cursor: !isBooked && !isBlocked ? "pointer" : "default",
                           }}
                           onMouseEnter={(e) => {
-                            if (!isBooked && !isBreak) {
+                            if (!isBooked && !isBlocked) {
                               e.currentTarget.style.transform = "translateY(-2px)";
                               e.currentTarget.style.boxShadow = "0 2px 8px rgba(0, 191, 99, 0.2)";
                             }

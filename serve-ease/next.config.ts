@@ -5,6 +5,8 @@ const nextConfig: NextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
+  // Explicitly scope tracing to this app to avoid lockfile root inference warnings.
+  outputFileTracingRoot: path.resolve(process.cwd()),
   webpack: (config) => {
     config.resolve.alias = {
       ...(config.resolve.alias ?? {}),

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Search, Filter, MapPin, Clock, Calendar, Phone, MessageCircle, Navigation, CheckCircle, X, ChevronRight } from "lucide-react";
+import { Search, Filter, MapPin, Clock, Calendar, X, ChevronRight } from "lucide-react";
 import { useNavigate } from "react-router";
 
 const styles = {

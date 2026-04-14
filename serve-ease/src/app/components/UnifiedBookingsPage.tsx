@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Search, Filter, MapPin, Calendar, Clock, ChevronRight, X } from "lucide-react";
-import { useNavigate } from "react-router";
+import { useNavigate, useLocation } from "react-router";
 
 const styles = {
   container: {
@@ -87,7 +87,7 @@ const styles = {
     gap: "8px",
     marginBottom: "24px",
     borderBottomColor: "#F3F4F6",
-    borderBottomStyle: "solid",
+    borderBottomStyle: "solid" as const,
     borderBottomWidth: "2px",
     paddingBottom: "0px",
   },
@@ -100,7 +100,7 @@ const styles = {
     backgroundColor: "transparent",
     color: "#6B7280",
     borderBottomColor: "transparent",
-    borderBottomStyle: "solid",
+    borderBottomStyle: "solid" as const,
     borderBottomWidth: "3px",
     transition: "all 0.3s ease",
     display: "flex",
@@ -272,6 +272,14 @@ const styles = {
     width: "100%",
     backgroundColor: "white",
     cursor: "pointer",
+    appearance: "none" as const,
+    WebkitAppearance: "none" as const,
+    MozAppearance: "none" as const,
+    backgroundImage: `url('data:image/svg+xml;utf8,<svg fill="none" stroke="%236B7280" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M6 9l6 6 6-6"></path></svg>')`,
+    backgroundRepeat: "no-repeat",
+    backgroundPosition: "right 14px center",
+    backgroundSize: "16px",
+    paddingRight: "40px",
   },
   emptyState: {
     textAlign: "center" as const,
@@ -318,7 +326,18 @@ interface Item {
 
 export function UnifiedBookingsPage() {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<TabType>("new-requests");
+  const location = useLocation();
+  const searchParams = new URLSearchParams(location.search);
+  const tabParam = searchParams.get("tab") as TabType;
+
+  const [activeTab, setActiveTab] = useState<TabType>(tabParam || "new-requests");
+
+  useEffect(() => {
+    if (tabParam) {
+      setActiveTab(tabParam);
+    }
+  }, [tabParam]);
+
   const [searchQuery, setSearchQuery] = useState("");
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [filterDateFrom, setFilterDateFrom] = useState("");
@@ -356,6 +375,26 @@ export function UnifiedBookingsPage() {
       location: "789 Rizal Street, Makati",
       distance: "2.5 km",
       price: 800,
+      status: "upcoming",
+    },
+    {
+      id: "8",
+      customerName: "Emily Davis",
+      serviceType: "Pipe Leak Repair",
+      date: "March 28, 2024",
+      time: "11:30 AM",
+      location: "456 Pine Ave",
+      price: 1200,
+      status: "upcoming",
+    },
+    {
+      id: "12",
+      customerName: "Michael Brown",
+      serviceType: "Water Heater Installation",
+      date: "March 29, 2024",
+      time: "2:00 PM",
+      location: "789 Maple Dr",
+      price: 4200,
       status: "upcoming",
     },
     {
@@ -409,6 +448,28 @@ export function UnifiedBookingsPage() {
     ) {
       return false;
     }
+
+    if (filterService && !item.serviceType.toLowerCase().includes(filterService.toLowerCase())) {
+      return false;
+    }
+
+    if (filterDateFrom || filterDateTo) {
+      const itemDate = new Date(item.date);
+      itemDate.setHours(0, 0, 0, 0);
+
+      if (filterDateFrom) {
+        const fromDate = new Date(filterDateFrom);
+        fromDate.setHours(0, 0, 0, 0);
+        if (itemDate < fromDate) return false;
+      }
+
+      if (filterDateTo) {
+        const toDate = new Date(filterDateTo);
+        toDate.setHours(0, 0, 0, 0);
+        if (itemDate > toDate) return false;
+      }
+    }
+
     return true;
   });
 

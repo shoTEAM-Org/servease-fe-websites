@@ -3,7 +3,7 @@ import {
   Search, 
   ChevronDown,
   ChevronUp,
-  Banknote,
+
   BookOpen,
   ShieldCheck,
   Mail,
@@ -34,9 +34,12 @@ const styles = {
     position: "relative" as const,
     marginBottom: "40px",
   },
+  searchForm: {
+    position: "relative" as const,
+  },
   searchInput: {
     width: "100%",
-    padding: "16px 24px 16px 56px",
+    padding: "16px 140px 16px 56px",
     borderRadius: "12px",
     border: "1px solid #E5E7EB",
     fontSize: "15px",
@@ -51,6 +54,56 @@ const styles = {
     top: "50%",
     transform: "translateY(-50%)",
     color: "#9CA3AF",
+  },
+  searchSubmitButton: {
+    position: "absolute" as const,
+    right: "10px",
+    top: "50%",
+    transform: "translateY(-50%)",
+    border: "none",
+    borderRadius: "8px",
+    backgroundColor: "#00BF63",
+    color: "white",
+    padding: "10px 16px",
+    fontSize: "13px",
+    fontWeight: "600",
+    cursor: "pointer",
+  },
+  resultsMeta: {
+    fontSize: "13px",
+    color: "#6B7280",
+    marginTop: "10px",
+  },
+  resultsPanel: {
+    marginBottom: "28px",
+    backgroundColor: "white",
+    borderRadius: "12px",
+    border: "1px solid #E5E7EB",
+    padding: "20px 24px",
+  },
+  resultSectionTitle: {
+    fontSize: "14px",
+    fontWeight: "700",
+    color: "#111827",
+    margin: "0 0 10px 0",
+  },
+  topicList: {
+    display: "flex",
+    flexWrap: "wrap" as const,
+    gap: "10px",
+  },
+  topicChip: {
+    backgroundColor: "#F3F4F6",
+    border: "1px solid #E5E7EB",
+    borderRadius: "999px",
+    padding: "6px 12px",
+    fontSize: "13px",
+    color: "#374151",
+  },
+  noResults: {
+    fontSize: "14px",
+    color: "#6B7280",
+    margin: 0,
   },
   sectionTitle: {
     fontSize: "16px",
@@ -217,8 +270,9 @@ const styles = {
 };
 
 export function ProviderHelpCenterPage() {
+  const [searchInput, setSearchInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
-  const [expandedFaq, setExpandedFaq] = useState<number | null>(0);
+  const [expandedFaq, setExpandedFaq] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("All");
 
   const tabs = ["All", "Payments", "Bookings", "Verification"];
@@ -301,6 +355,43 @@ export function ProviderHelpCenterPage() {
     },
   ];
 
+  const helpTopics = [
+    "Payout schedule and methods",
+    "Booking cancellations",
+    "Profile verification",
+    "Service rates and pricing",
+    "Customer messaging",
+    "Account security",
+  ];
+
+  const normalizedQuery = searchQuery.trim().toLowerCase();
+
+  const filteredFaqs = faqs.filter((faq) => {
+    const matchesTab = activeTab === "All" || faq.category.includes(activeTab);
+
+    if (!normalizedQuery) {
+      return matchesTab;
+    }
+
+    const searchableFaq = `${faq.title} ${faq.category} ${faq.answer}`.toLowerCase();
+    return matchesTab && searchableFaq.includes(normalizedQuery);
+  });
+
+  const matchingTopics = normalizedQuery
+    ? helpTopics.filter((topic) => topic.toLowerCase().includes(normalizedQuery))
+    : [];
+
+  const hasSubmittedSearch = searchQuery.trim().length > 0;
+  const totalResults = filteredFaqs.length + matchingTopics.length;
+  const shouldShowResultsPanel =
+    matchingTopics.length > 0 || (matchingTopics.length === 0 && filteredFaqs.length === 0);
+
+  const handleSearchSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setSearchQuery(searchInput.trim());
+    setExpandedFaq(null);
+  };
+
   return (
     <div style={styles.container}>
       {/* Header */}
@@ -312,24 +403,34 @@ export function ProviderHelpCenterPage() {
       <div style={styles.content}>
         {/* Search Bar */}
         <div style={styles.searchContainer}>
-          <div style={styles.searchIcon}>
-            <Search size={20} />
-          </div>
-          <input
-            type="text"
-            placeholder="Search help articles..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            style={styles.searchInput}
-            onFocus={(e) => {
-              e.currentTarget.style.borderColor = "#00BF63";
-              e.currentTarget.style.boxShadow = "0 0 0 3px rgba(0, 191, 99, 0.1)";
-            }}
-            onBlur={(e) => {
-              e.currentTarget.style.borderColor = "#E5E7EB";
-              e.currentTarget.style.boxShadow = "none";
-            }}
-          />
+          <form style={styles.searchForm} onSubmit={handleSearchSubmit}>
+            <div style={styles.searchIcon}>
+              <Search size={20} />
+            </div>
+            <input
+              type="text"
+              placeholder="Search help articles..."
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              style={styles.searchInput}
+              onFocus={(e) => {
+                e.currentTarget.style.borderColor = "#00BF63";
+                e.currentTarget.style.boxShadow = "0 0 0 3px rgba(0, 191, 99, 0.1)";
+              }}
+              onBlur={(e) => {
+                e.currentTarget.style.borderColor = "#E5E7EB";
+                e.currentTarget.style.boxShadow = "none";
+              }}
+            />
+            <button type="submit" style={styles.searchSubmitButton} aria-label="Search help center">
+              Search
+            </button>
+          </form>
+          {hasSubmittedSearch && (
+            <div style={styles.resultsMeta}>
+              {totalResults} result{totalResults === 1 ? "" : "s"} for "{searchQuery}"
+            </div>
+          )}
         </div>
 
         {/* Tabs */}
@@ -351,22 +452,40 @@ export function ProviderHelpCenterPage() {
 
         {/* Frequently Asked Questions */}
         <div style={styles.faqContainer}>
-          <h2 style={styles.sectionTitle}>Frequently Asked Questions</h2>
+          <h2 style={styles.sectionTitle}>{hasSubmittedSearch ? "Search Results" : "Frequently Asked Questions"}</h2>
           <p style={styles.faqSubtitle}>
-            Tap a question to see the answer
+            {hasSubmittedSearch ? "Relevant matches across FAQs and help topics" : "Tap a question to see the answer"}
           </p>
 
+          {hasSubmittedSearch && shouldShowResultsPanel && (
+            <div style={styles.resultsPanel}>
+              {matchingTopics.length > 0 && (
+                <>
+                  <h3 style={styles.resultSectionTitle}>Matching Topics</h3>
+                  <div style={styles.topicList}>
+                    {matchingTopics.map((topic) => (
+                      <span key={topic} style={styles.topicChip}>{topic}</span>
+                    ))}
+                  </div>
+                </>
+              )}
+
+              {matchingTopics.length === 0 && filteredFaqs.length === 0 && (
+                <p style={styles.noResults}>
+                  No help content matched your search. Try a broader keyword.
+                </p>
+              )}
+            </div>
+          )}
+
           <div style={styles.faqList}>
-            {faqs
-              .filter((faq) =>
-                activeTab === "All" || faq.category.includes(activeTab)
-              )
-              .map((faq, index) => (
-                <div key={index} style={styles.faqItem}>
+            {filteredFaqs
+              .map((faq) => (
+                <div key={faq.title} style={styles.faqItem}>
                   <button
                     style={styles.faqButton}
                     onClick={() =>
-                      setExpandedFaq(expandedFaq === index ? null : index)
+                      setExpandedFaq(expandedFaq === faq.title ? null : faq.title)
                     }
                     onFocus={(e) => {
                       e.currentTarget.parentElement!.style.borderColor = "#00BF63";
@@ -377,7 +496,7 @@ export function ProviderHelpCenterPage() {
                       e.currentTarget.parentElement!.style.borderColor = "#E5E7EB";
                       e.currentTarget.parentElement!.style.boxShadow = "none";
                     }}
-                    aria-expanded={expandedFaq === index}
+                    aria-expanded={expandedFaq === faq.title}
                     aria-label={`${faq.title} - ${faq.category}`}
                   >
                     <div style={styles.faqHeader}>
@@ -403,7 +522,7 @@ export function ProviderHelpCenterPage() {
                         </span>
                       </div>
                       <div style={styles.faqToggle}>
-                        {expandedFaq === index ? (
+                        {expandedFaq === faq.title ? (
                           <ChevronUp size={20} />
                         ) : (
                           <ChevronDown size={20} />
@@ -411,7 +530,7 @@ export function ProviderHelpCenterPage() {
                       </div>
                     </div>
                   </button>
-                  {expandedFaq === index && (
+                  {expandedFaq === faq.title && (
                     <div style={styles.faqAnswer}>{faq.answer}</div>
                   )}
                 </div>

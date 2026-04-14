@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { Search, Send, Paperclip, ExternalLink, Star } from 'lucide-react';
+import { useNavigate } from 'react-router';
 
 // Styles object for reusability - matching CounterOfferPage aesthetic
 const styles = {
@@ -40,7 +41,9 @@ const styles = {
     fontWeight: '600',
     cursor: 'pointer',
     transition: 'all 0.2s ease',
-    borderBottom: '2px solid transparent',
+    borderBottomWidth: '2px',
+    borderBottomStyle: 'solid',
+    borderBottomColor: 'transparent',
     color: '#6B7280',
   } as React.CSSProperties,
   filterTabActive: {
@@ -165,6 +168,7 @@ export function MessagesPage() {
   const [messageText, setMessageText] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [filterTab, setFilterTab] = useState<'all' | 'booking' | 'general'>('all');
+  const navigate = useNavigate();
   // Dynamically measured available height (viewport minus sticky header)
   const [contentHeight, setContentHeight] = useState<string>('calc(100vh - 65px)');
 
@@ -284,6 +288,20 @@ export function MessagesPage() {
   });
 
   const activeConversation = conversations.find((c) => c.id === selectedConversation);
+
+  // Auto-select first visible conversation if active one is filtered out
+  useEffect(() => {
+    if (selectedConversation !== null) {
+      const isVisible = filteredConversations.some(c => c.id === selectedConversation);
+      if (!isVisible && filteredConversations.length > 0) {
+        setSelectedConversation(filteredConversations[0].id);
+      } else if (!isVisible && filteredConversations.length === 0) {
+        setSelectedConversation(null);
+      }
+    } else if (filteredConversations.length > 0) {
+      setSelectedConversation(filteredConversations[0].id);
+    }
+  }, [filteredConversations, selectedConversation]);
 
   // Auto-scroll to bottom when messages change
   useEffect(() => {
@@ -606,6 +624,7 @@ export function MessagesPage() {
                         ...styles.button,
                         ...styles.secondaryButton,
                       }}
+                      onClick={() => navigate(`/provider/customer-profile/${activeConversation.id}`)}
                       onMouseEnter={(e) => {
                         e.currentTarget.style.backgroundColor = '#F0FDF4';
                       }}

@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
-import { Plus, X, Save, ChevronDown, CheckCircle2, DollarSign, Edit2, Trash2 } from "lucide-react";
-import { useNavigate } from "react-router";
+import { useEffect, useMemo, useState } from "react";
+import { Plus, Save, Edit2, Trash2 } from "lucide-react";
+import { useLocation, useNavigate } from "react-router";
 import { useProviderData } from "../context/ProviderDataContext";
 
 const styles = {
@@ -143,26 +143,48 @@ interface Service {
 
 export function EditServicesPricingPage() {
   const navigate = useNavigate();
-  const { providerData, setProviderData } = useProviderData();
+  const location = useLocation();
+  const { providerData, setServices: persistServices } = useProviderData();
+
+  const navigationState = (location.state as { from?: string } | null) ?? null;
+  const fromState = navigationState?.from;
+  const fromQuery = new URLSearchParams(location.search).get("from");
+  const origin = fromState ?? fromQuery;
+  const cancelDestination = origin === "dashboard" ? "/provider/dashboard" : "/provider/edit-profile";
   
-  const [services, setServices] = useState<Service[]>(providerData.services.map(s => ({
-    id: s.id,
-    name: s.name,
-    description: s.description,
-    category: s.category,
-    basePrice: s.baseRate.toString(),
-    priceUnit: s.priceUnit,
-    minPrice: "0",
-    maxPrice: "0",
-    duration: s.estimatedDuration,
-    durationUnit: "hours",
-    calloutFee: "0",
-    emergencyRate: "1.0x",
-    materialsMarkup: "0",
-    active: s.isActive,
-  })));
+  const mappedContextServices = useMemo(
+    () =>
+      providerData.services.map((s) => ({
+        id: s.id,
+        name: s.name,
+        description: s.description,
+        category: s.category,
+        basePrice: s.baseRate.toString(),
+        priceUnit: s.priceUnit,
+        minPrice: "0",
+        maxPrice: "0",
+        duration: s.estimatedDuration,
+        durationUnit: "hours",
+        calloutFee: "0",
+        emergencyRate: "1.0x",
+        materialsMarkup: "0",
+        active: s.isActive,
+      })),
+    [providerData.services]
+  );
+
+  const [services, setServices] = useState<Service[]>(mappedContextServices);
 
   const [editingId, setEditingId] = useState<string | null>(null);
+
+  useEffect(() => {
+    setServices(mappedContextServices);
+  }, [mappedContextServices]);
+
+  const hasUnsavedChanges = useMemo(
+    () => JSON.stringify(services) !== JSON.stringify(mappedContextServices),
+    [services, mappedContextServices]
+  );
 
   const addNewService = () => {
     const newService: Service = {
@@ -195,10 +217,26 @@ export function EditServicesPricingPage() {
     );
   };
 
-  const handleSaveAll = () => {
-    console.log("Saving all services...", services);
+  const handleSaveChanges = () => {
+    persistServices(
+      services.map((s) => ({
+        id: s.id,
+        name: s.name,
+        description: s.description,
+        category: s.category,
+        baseRate: String(parseFloat(s.basePrice) || 0),
+        priceUnit: s.priceUnit,
+        estimatedDuration: s.duration,
+        isActive: s.active,
+      }))
+    );
     setEditingId(null);
   };
+
+//   const handleSaveAll = () => {
+//     console.log("Saving all services...", services);
+//     setEditingId(null);
+//   };
 
   return (
     <div style={styles.container}>
@@ -645,7 +683,7 @@ export function EditServicesPricingPage() {
       {/* Sticky Footer */}
       <div style={styles.stickyFooter}>
         <button
-          onClick={() => navigate("/provider/edit-profile")}
+          onClick={() => navigate(cancelDestination)}
           style={{
             ...styles.button,
             ...styles.secondaryButton,
@@ -660,38 +698,32 @@ export function EditServicesPricingPage() {
           Cancel
         </button>
         <button
-          onClick={() => {
-            // Save services to context
-            setProviderData({
-              ...providerData,
-              services: services.map(s => ({
-                id: s.id,
-                name: s.name,
-                description: s.description,
-                category: s.category,
-                baseRate: String(parseFloat(s.basePrice) || 0),
-                priceUnit: s.priceUnit,
-                estimatedDuration: s.duration,
-                isActive: s.active,
-              })),
-            });
-            setEditingId(null);
-            // Navigate back to edit profile
-            navigate("/provider/edit-profile");
-          }}
+          onClick={handleSaveChanges}
+          disabled={!hasUnsavedChanges}
           style={{
             ...styles.button,
-            ...styles.primaryButton,
+            ...(hasUnsavedChanges
+              ? styles.primaryButton
+              : {
+                  backgroundColor: "#D1D5DB",
+                  color: "#6B7280",
+                  boxShadow: "none",
+                  cursor: "not-allowed",
+                }),
           }}
           onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = "#059669";
+            if (hasUnsavedChanges) {
+              e.currentTarget.style.backgroundColor = "#059669";
+            }
           }}
           onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = "#00BF63";
+            if (hasUnsavedChanges) {
+              e.currentTarget.style.backgroundColor = "#00BF63";
+            }
           }}
         >
           <Save style={{ width: "18px", height: "18px" }} />
-          Save All Changes
+          Save Changes
         </button>
       </div>
     </div>

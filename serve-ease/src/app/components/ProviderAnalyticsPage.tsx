@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Fragment } from "react";
+import { useState, Fragment } from "react";
+import { useNavigate } from "react-router";
 import {
   Calendar,
   TrendingUp,
@@ -9,12 +9,12 @@ import {
   Clock,
   MapPin,
   PieChart,
-  RefreshCw,
+
   Target,
   ShoppingBag,
   BarChart3,
   Lightbulb,
-  TrendingDown,
+
   Settings,
   Eye,
   ArrowUpRight,
@@ -65,6 +65,14 @@ const styles = {
     backgroundColor: "white",
     cursor: "pointer",
     fontWeight: "500",
+    appearance: "none" as const,
+    WebkitAppearance: "none" as const,
+    MozAppearance: "none" as const,
+    backgroundImage: `url('data:image/svg+xml;utf8,<svg fill="none" stroke="%236B7280" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M6 9l6 6 6-6"></path></svg>')`,
+    backgroundRepeat: "no-repeat",
+    backgroundPosition: "right 16px center",
+    backgroundSize: "16px",
+    paddingRight: "40px",
   },
   button: {
     padding: "10px 20px",
@@ -419,46 +427,59 @@ const styles = {
 
 export function ProviderAnalyticsPage() {
   const [dateRange, setDateRange] = useState("last-30-days");
+  const navigate = useNavigate();
 
-  // Mock data
-  const stats = [
-    {
-      label: "Total Bookings",
-      value: "248",
-      change: "+12.5%",
-      isPositive: true,
-      icon: ShoppingBag,
-      color: "#00BF63",
-      bgColor: "#D1FAE5",
-    },
-    {
-      label: "Total Revenue",
-      value: "₱324,500",
-      change: "+18.2%",
-      isPositive: true,
-      icon: DollarSign,
-      color: "#3B82F6",
-      bgColor: "#DBEAFE",
-    },
-    {
-      label: "Active Customers",
-      value: "142",
-      change: "+8.4%",
-      isPositive: true,
-      icon: Users,
-      color: "#8B5CF6",
-      bgColor: "#EDE9FE",
-    },
-    {
-      label: "New Customers",
-      value: "34",
-      change: "+23.1%",
-      isPositive: true,
-      icon: TrendingUp,
-      color: "#F59E0B",
-      bgColor: "#FEF3C7",
-    },
-  ];
+  // Dynamic Mock data based on date filter
+  const getStats = () => {
+    switch (dateRange) {
+      case "last-7-days":
+        return [
+          { label: "Total Bookings", value: "48", change: "+5.1%", isPositive: true, icon: ShoppingBag, color: "#00BF63", bgColor: "#D1FAE5" },
+          { label: "Total Revenue", value: "₱64,900", change: "-2.4%", isPositive: false, icon: DollarSign, color: "#3B82F6", bgColor: "#DBEAFE" },
+          { label: "Active Customers", value: "42", change: "+1.2%", isPositive: true, icon: Users, color: "#8B5CF6", bgColor: "#EDE9FE" },
+          { label: "New Customers", value: "8", change: "+14.3%", isPositive: true, icon: TrendingUp, color: "#F59E0B", bgColor: "#FEF3C7" },
+        ];
+      case "last-90-days":
+        return [
+          { label: "Total Bookings", value: "712", change: "+18.5%", isPositive: true, icon: ShoppingBag, color: "#00BF63", bgColor: "#D1FAE5" },
+          { label: "Total Revenue", value: "₱920,400", change: "+24.2%", isPositive: true, icon: DollarSign, color: "#3B82F6", bgColor: "#DBEAFE" },
+          { label: "Active Customers", value: "312", change: "+15.4%", isPositive: true, icon: Users, color: "#8B5CF6", bgColor: "#EDE9FE" },
+          { label: "New Customers", value: "89", change: "+42.1%", isPositive: true, icon: TrendingUp, color: "#F59E0B", bgColor: "#FEF3C7" },
+        ];
+      case "last-30-days":
+      default:
+        return [
+          { label: "Total Bookings", value: "248", change: "+12.5%", isPositive: true, icon: ShoppingBag, color: "#00BF63", bgColor: "#D1FAE5" },
+          { label: "Total Revenue", value: "₱324,500", change: "+18.2%", isPositive: true, icon: DollarSign, color: "#3B82F6", bgColor: "#DBEAFE" },
+          { label: "Active Customers", value: "142", change: "+8.4%", isPositive: true, icon: Users, color: "#8B5CF6", bgColor: "#EDE9FE" },
+          { label: "New Customers", value: "34", change: "+23.1%", isPositive: true, icon: TrendingUp, color: "#F59E0B", bgColor: "#FEF3C7" },
+        ];
+    }
+  };
+
+  const getServiceCategories = () => {
+    switch (dateRange) {
+      case "last-7-days":
+        return [
+          { name: "Plumbing", value: 45, color: "#00BF63" },
+          { name: "Electrical", value: 20, color: "#3B82F6" },
+          { name: "Carpentry", value: 15, color: "#8B5CF6" },
+          { name: "Painting", value: 10, color: "#F59E0B" },
+          { name: "Others", value: 10, color: "#6B7280" },
+        ];
+      default:
+        return [
+          { name: "Plumbing", value: 35, color: "#00BF63" },
+          { name: "Electrical", value: 28, color: "#3B82F6" },
+          { name: "Carpentry", value: 18, color: "#8B5CF6" },
+          { name: "Painting", value: 12, color: "#F59E0B" },
+          { name: "Others", value: 7, color: "#6B7280" },
+        ];
+    }
+  };
+
+  const stats = getStats();
+  const serviceCategories = getServiceCategories();
 
   const heatmapData = [
     { time: "6am-9am", values: [2, 3, 4, 5, 6, 8, 4] },
@@ -477,17 +498,21 @@ export function ProviderAnalyticsPage() {
     return { bg: "#F3F4F6", color: "#6B7280" };
   };
 
-  const serviceCategories = [
-    { name: "Plumbing", value: 35, color: "#00BF63" },
-    { name: "Electrical", value: 28, color: "#3B82F6" },
-    { name: "Carpentry", value: 18, color: "#8B5CF6" },
-    { name: "Painting", value: 12, color: "#F59E0B" },
-    { name: "Others", value: 7, color: "#6B7280" },
-  ];
-
   const handleExport = () => {
-    // Handle export functionality
-    console.log("Exporting report...");
+    const csvContent = 
+      "data:text/csv;charset=utf-8," + 
+      "Metric,Value,Change\n" +
+      stats.map(s => `${s.label},"${s.value}","${s.change}"`).join("\n") +
+      "\n\nService Category,Percentage\n" +
+      serviceCategories.map(s => `${s.name},${s.value}%`).join("\n");
+
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `analytics_report_${dateRange}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   return (
@@ -621,6 +646,7 @@ export function ProviderAnalyticsPage() {
               {index === 1 && (
                 <button
                   style={styles.actionButton}
+                  onClick={() => navigate("/provider/edit-services")}
                   onMouseEnter={(e) => {
                     e.currentTarget.style.backgroundColor = "#F9FAFB";
                     e.currentTarget.style.borderColor = "#00BF63";
@@ -647,6 +673,7 @@ export function ProviderAnalyticsPage() {
           </h2>
           <button
             style={styles.actionButton}
+            onClick={() => navigate("/provider/bookings")}
             onMouseEnter={(e) => {
               e.currentTarget.style.backgroundColor = "#F9FAFB";
               e.currentTarget.style.borderColor = "#00BF63";
@@ -760,6 +787,7 @@ export function ProviderAnalyticsPage() {
         <div style={{ marginTop: "20px" }}>
           <button
             style={styles.actionButton}
+            onClick={() => navigate("/provider/availability")}
             onMouseEnter={(e) => {
               e.currentTarget.style.backgroundColor = "#F9FAFB";
               e.currentTarget.style.borderColor = "#00BF63";

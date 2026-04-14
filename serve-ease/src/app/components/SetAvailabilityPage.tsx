@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Calendar } from "lucide-react";
 import { useNavigate } from "react-router";
 import { useProviderData } from "../context/ProviderDataContext";
@@ -102,8 +102,12 @@ export function SetAvailabilityPage() {
     providerData.availability
   );
 
+  useEffect(() => {
+    setSchedule(providerData.availability);
+  }, [providerData.availability]);
+
   const [copyToAll, setCopyToAll] = useState(false);
-  const [recurringDaysOff, setRecurringDaysOff] = useState<string[]>([]);
+// //   const [recurringDaysOff, setRecurringDaysOff] = useState<string[]>([]);
   const [offReason, setOffReason] = useState("");
 
   const daysOfWeek = [
@@ -144,13 +148,10 @@ export function SetAvailabilityPage() {
   };
 
   const handleSaveChanges = () => {
-    // Save availability to context
-    setProviderData({
-      ...providerData,
+    setProviderData((prev) => ({
+      ...prev,
       availability: schedule,
-    });
-    console.log("Availability saved:", schedule);
-    // Navigate back to calendar to show updated availability
+    }));
     navigate("/provider/calendar");
   };
 

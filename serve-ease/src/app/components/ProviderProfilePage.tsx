@@ -10,6 +10,8 @@ import {
   Edit2,
   Briefcase,
   Calendar,
+  X,
+  Plus,
 } from "lucide-react";
 import { ImageWithFallback } from "./figma/ImageWithFallback";
 import { useNavigate } from "react-router";
@@ -74,9 +76,32 @@ const styles = {
   },
 };
 
+interface ServiceForm {
+  name: string;
+  category: string;
+  description: string;
+  baseRate: string;
+  priceUnit: string;
+  estimatedDuration: string;
+}
+
+const EMPTY_SERVICE_FORM: ServiceForm = {
+  name: "",
+  category: "Residential",
+  description: "",
+  baseRate: "",
+  priceUnit: "per hour",
+  estimatedDuration: "",
+};
+
 export function ProviderProfilePage() {
   const [activeTab, setActiveTab] = useState("About");
   const isOwnProfile = true; // This would be determined by auth state
+
+  // Service modal state
+  const [showServiceModal, setShowServiceModal] = useState(false);
+  const [editingServiceId, setEditingServiceId] = useState<string | null>(null);
+  const [serviceForm, setServiceForm] = useState<ServiceForm>(EMPTY_SERVICE_FORM);
 
   const tabs = ["About", "Services & Pricing", "Portfolio", "Reviews", "Availability"];
 
@@ -87,14 +112,67 @@ export function ProviderProfilePage() {
     { icon: Award, label: "Top Rated", color: "#F59E0B", bg: "#FEF3C7" },
   ];
 
-  const services = [
-    { name: "House Cleaning", price: "₱500/hr" },
-    { name: "Deep Cleaning", price: "₱800/hr" },
-    { name: "Office Cleaning", price: "₱1,200/hr" },
-  ];
-
   const navigate = useNavigate();
   const providerData = useProviderData();
+  const { services, setServices } = providerData;
+  const { profile } = providerData;
+  const displayName = profile.businessName || "Service Provider";
+  const serviceArea = profile.serviceAreas || "Metro Manila, Philippines";
+  const yearsExperienceText = profile.yearsExperience
+    ? `${profile.yearsExperience} years`
+    : "Experienced provider";
+  const certifications = profile.certifications?.length
+    ? profile.certifications
+    : ["No certifications added yet"];
+  const licenses = profile.licenses?.filter(
+    (license) => license.type || license.number || license.expiry
+  ) ?? [];
+
+  const openAddModal = () => {
+    setEditingServiceId(null);
+    setServiceForm(EMPTY_SERVICE_FORM);
+    setShowServiceModal(true);
+  };
+
+  const openEditModal = (serviceId: string) => {
+    const svc = services.find((s) => s.id === serviceId);
+    if (!svc) return;
+    setEditingServiceId(serviceId);
+    setServiceForm({
+      name: svc.name,
+      category: svc.category,
+      description: svc.description,
+      baseRate: svc.baseRate,
+      priceUnit: svc.priceUnit,
+      estimatedDuration: svc.estimatedDuration,
+    });
+    setShowServiceModal(true);
+  };
+
+  const handleServiceSave = () => {
+    if (!serviceForm.name.trim() || !serviceForm.baseRate.trim()) return;
+    if (editingServiceId) {
+      // Update existing
+      setServices(
+        services.map((s) =>
+          s.id === editingServiceId ? { ...s, ...serviceForm } : s
+        )
+      );
+    } else {
+      // Add new
+      const newService = {
+        id: Date.now().toString(),
+        ...serviceForm,
+        isActive: true,
+      };
+      setServices([...services, newService]);
+    }
+    setShowServiceModal(false);
+  };
+
+  const handleFormChange = (field: keyof ServiceForm, value: string) => {
+    setServiceForm((prev) => ({ ...prev, [field]: value }));
+  };
 
   return (
     <div style={styles.container}>
@@ -188,14 +266,14 @@ export function ProviderProfilePage() {
                     letterSpacing: "-0.025em",
                   }}
                 >
-                  Juan Dela Cruz
+                  {displayName}
                 </h1>
                 
                 {/* Additional Info - Location, Rating, Completed Jobs */}
                 <div style={{ display: "flex", alignItems: "center", gap: "16px", marginBottom: "12px" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                     <MapPin style={{ width: "16px", height: "16px", color: "#6B7280" }} />
-                    <span style={{ fontSize: "14px", color: "#6B7280" }}>Metro Manila</span>
+                    <span style={{ fontSize: "14px", color: "#6B7280" }}>{serviceArea}</span>
                   </div>
                   <div style={{ width: "4px", height: "4px", borderRadius: "50%", backgroundColor: "#D1D5DB" }} />
                   <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
@@ -507,10 +585,7 @@ export function ProviderProfilePage() {
                     About Me
                   </h2>
                   <p style={{ fontSize: "15px", color: "#374151", lineHeight: "1.7" }}>
-                    With over 8 years of professional cleaning experience, I take pride in
-                    delivering exceptional service to every client. I specialize in
-                    residential and commercial cleaning, using eco-friendly products and
-                    proven techniques to ensure your space is spotless and healthy.
+                    {profile.bio || "No bio added yet."}
                   </p>
                   <p
                     style={{
@@ -520,10 +595,7 @@ export function ProviderProfilePage() {
                       marginTop: "16px",
                     }}
                   >
-                    I'm fully licensed, insured, and committed to providing reliable,
-                    professional service. Customer satisfaction is my top priority, and I
-                    work closely with each client to meet their specific needs and
-                    preferences.
+                    {`Experience: ${yearsExperienceText}. Languages: ${profile.languages.join(", ") || "Not specified"}.`}
                   </p>
                 </div>
 
@@ -540,11 +612,7 @@ export function ProviderProfilePage() {
                     Certifications & Training
                   </h2>
                   <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-                    {[
-                      "Professional Cleaning Certification - ISSA",
-                      "Green Cleaning Specialist",
-                      "Workplace Safety & Health Training",
-                    ].map((cert, index) => (
+                    {certifications.map((cert, index) => (
                       <div
                         key={index}
                         style={{
@@ -561,6 +629,52 @@ export function ProviderProfilePage() {
                       </div>
                     ))}
                   </div>
+                </div>
+
+                {/* Licenses */}
+                <div style={{ ...styles.card, marginTop: "24px" }}>
+                  <h2
+                    style={{
+                      fontSize: "20px",
+                      fontWeight: "bold",
+                      color: "#111827",
+                      marginBottom: "16px",
+                    }}
+                  >
+                    Licenses
+                  </h2>
+                  {licenses.length > 0 ? (
+                    <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                      {licenses.map((license, index) => (
+                        <div
+                          key={`${license.type}-${index}`}
+                          style={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                            gap: "12px",
+                            padding: "12px",
+                            backgroundColor: "#F9FAFB",
+                            borderRadius: "8px",
+                          }}
+                        >
+                          <div>
+                            <div style={{ fontSize: "14px", fontWeight: "600", color: "#111827" }}>
+                              {license.type || "License"}
+                            </div>
+                            <div style={{ fontSize: "13px", color: "#6B7280" }}>
+                              {license.number || "No license number"}
+                            </div>
+                          </div>
+                          <div style={{ fontSize: "13px", color: "#6B7280" }}>
+                            {license.expiry ? `Expires ${license.expiry}` : "No expiry date"}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p style={{ fontSize: "14px", color: "#6B7280" }}>No licenses added yet.</p>
+                  )}
                 </div>
               </div>
 
@@ -608,7 +722,7 @@ export function ProviderProfilePage() {
                           {service.name}
                         </span>
                         <span style={{ fontSize: "15px", fontWeight: "800", color: "#00BF63" }}>
-                          {service.price}
+                          ₱{service.baseRate}/{service.priceUnit.replace("per ", "")}
                         </span>
                       </div>
                     ))}
@@ -633,7 +747,7 @@ export function ProviderProfilePage() {
                   <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                     <MapPin style={{ width: "18px", height: "18px", color: "#00BF63" }} />
                     <span style={{ fontSize: "14px", color: "#374151" }}>
-                      Metro Manila, Philippines
+                      {serviceArea}
                     </span>
                   </div>
                 </div>
@@ -663,6 +777,55 @@ export function ProviderProfilePage() {
                     </span>
                   </div>
                 </div>
+
+                {/* Social Links */}
+                <div style={{ ...styles.card, marginTop: "24px" }}>
+                  <h3
+                    style={{
+                      fontSize: "16px",
+                      fontWeight: "bold",
+                      color: "#111827",
+                      marginBottom: "12px",
+                    }}
+                  >
+                    Social Links
+                  </h3>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                    {profile.facebook && (
+                      <a
+                        href={profile.facebook}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{ fontSize: "14px", color: "#00BF63", textDecoration: "none" }}
+                      >
+                        Facebook
+                      </a>
+                    )}
+                    {profile.instagram && (
+                      <a
+                        href={profile.instagram}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{ fontSize: "14px", color: "#00BF63", textDecoration: "none" }}
+                      >
+                        Instagram
+                      </a>
+                    )}
+                    {profile.website && (
+                      <a
+                        href={profile.website}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{ fontSize: "14px", color: "#00BF63", textDecoration: "none" }}
+                      >
+                        Website
+                      </a>
+                    )}
+                    {!profile.facebook && !profile.instagram && !profile.website && (
+                      <span style={{ fontSize: "14px", color: "#6B7280" }}>No social links added yet.</span>
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
           )}
@@ -676,7 +839,7 @@ export function ProviderProfilePage() {
                     ...styles.button,
                     ...styles.primaryButton,
                   }}
-                  onClick={() => navigate("/provider/edit-services")}
+                  onClick={openAddModal}
                   onMouseEnter={(e) => {
                     e.currentTarget.style.backgroundColor = "#059669";
                   }}
@@ -684,7 +847,8 @@ export function ProviderProfilePage() {
                     e.currentTarget.style.backgroundColor = "#00BF63";
                   }}
                 >
-                  + Add New Service
+                  <Plus style={{ width: "16px", height: "16px" }} />
+                  Add New Service
                 </button>
               </div>
 
@@ -886,7 +1050,7 @@ export function ProviderProfilePage() {
                           }}
                           onClick={(e) => {
                             e.stopPropagation();
-                            navigate("/provider/edit-services");
+                            openEditModal(service.id);
                           }}
                           onMouseEnter={(e) => {
                             e.currentTarget.style.backgroundColor = "#F9FAFB";
@@ -1063,6 +1227,198 @@ export function ProviderProfilePage() {
           )}
         </div>
       </div>
+
+      {/* ====== Add / Edit Service Modal ====== */}
+      {showServiceModal && (
+        <>
+          {/* Backdrop */}
+          <div
+            onClick={() => setShowServiceModal(false)}
+            style={{
+              position: "fixed",
+              inset: 0,
+              backgroundColor: "rgba(0,0,0,0.4)",
+              zIndex: 1000,
+              backdropFilter: "blur(2px)",
+            }}
+          />
+          {/* Modal */}
+          <div
+            style={{
+              position: "fixed",
+              top: "50%",
+              left: "50%",
+              transform: "translate(-50%, -50%)",
+              zIndex: 1001,
+              backgroundColor: "white",
+              borderRadius: "20px",
+              boxShadow: "0 24px 64px rgba(0,0,0,0.2)",
+              padding: "32px",
+              width: "560px",
+              maxWidth: "90vw",
+              maxHeight: "90vh",
+              overflowY: "auto",
+            }}
+          >
+            {/* Header */}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "24px" }}>
+              <h2 style={{ fontSize: "20px", fontWeight: "700", color: "#111827", margin: 0 }}>
+                {editingServiceId ? "Edit Service" : "Add New Service"}
+              </h2>
+              <button
+                onClick={() => setShowServiceModal(false)}
+                style={{ background: "none", border: "none", cursor: "pointer", padding: "4px", borderRadius: "8px", display: "flex", alignItems: "center" }}
+                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "#F3F4F6"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "transparent"; }}
+              >
+                <X style={{ width: "20px", height: "20px", color: "#6B7280" }} />
+              </button>
+            </div>
+
+            {/* Form Fields */}
+            <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+
+              {/* Service Name */}
+              <div>
+                <label style={{ fontSize: "13px", fontWeight: "600", color: "#374151", display: "block", marginBottom: "6px" }}>
+                  Service Name <span style={{ color: "#EF4444" }}>*</span>
+                </label>
+                <input
+                  type="text"
+                  value={serviceForm.name}
+                  onChange={(e) => handleFormChange("name", e.target.value)}
+                  placeholder="e.g., House Cleaning"
+                  style={{ width: "100%", padding: "10px 14px", border: "2px solid #E5E7EB", borderRadius: "10px", fontSize: "14px", outline: "none", boxSizing: "border-box" as const }}
+                  onFocus={(e) => { e.currentTarget.style.borderColor = "#00BF63"; }}
+                  onBlur={(e) => { e.currentTarget.style.borderColor = "#E5E7EB"; }}
+                />
+              </div>
+
+              {/* Category */}
+              <div>
+                <label style={{ fontSize: "13px", fontWeight: "600", color: "#374151", display: "block", marginBottom: "6px" }}>Category</label>
+                <select
+                  value={serviceForm.category}
+                  onChange={(e) => handleFormChange("category", e.target.value)}
+                  style={{
+                    width: "100%",
+                    padding: "10px 40px 10px 14px",
+                    border: "2px solid #E5E7EB",
+                    borderRadius: "10px",
+                    fontSize: "14px",
+                    outline: "none",
+                    backgroundColor: "white",
+                    cursor: "pointer",
+                    appearance: "none",
+                    WebkitAppearance: "none",
+                    backgroundImage: `url('data:image/svg+xml;utf8,<svg fill="none" stroke="%236B7280" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M6 9l6 6 6-6"></path></svg>')`,
+                    backgroundRepeat: "no-repeat",
+                    backgroundPosition: "right 12px center",
+                    backgroundSize: "16px",
+                  }}
+                >
+                  {["Residential", "Commercial", "Specialized", "Other"].map((c) => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Description */}
+              <div>
+                <label style={{ fontSize: "13px", fontWeight: "600", color: "#374151", display: "block", marginBottom: "6px" }}>Description</label>
+                <textarea
+                  value={serviceForm.description}
+                  onChange={(e) => handleFormChange("description", e.target.value)}
+                  placeholder="Describe your service..."
+                  rows={3}
+                  style={{ width: "100%", padding: "10px 14px", border: "2px solid #E5E7EB", borderRadius: "10px", fontSize: "14px", outline: "none", resize: "vertical", fontFamily: "inherit", boxSizing: "border-box" as const }}
+                  onFocus={(e) => { e.currentTarget.style.borderColor = "#00BF63"; }}
+                  onBlur={(e) => { e.currentTarget.style.borderColor = "#E5E7EB"; }}
+                />
+              </div>
+
+              {/* Base Rate + Price Unit — side by side */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+                <div>
+                  <label style={{ fontSize: "13px", fontWeight: "600", color: "#374151", display: "block", marginBottom: "6px" }}>
+                    Base Rate (₱) <span style={{ color: "#EF4444" }}>*</span>
+                  </label>
+                  <input
+                    type="number"
+                    value={serviceForm.baseRate}
+                    onChange={(e) => handleFormChange("baseRate", e.target.value)}
+                    placeholder="e.g., 500"
+                    style={{ width: "100%", padding: "10px 14px", border: "2px solid #E5E7EB", borderRadius: "10px", fontSize: "14px", outline: "none", boxSizing: "border-box" as const }}
+                    onFocus={(e) => { e.currentTarget.style.borderColor = "#00BF63"; }}
+                    onBlur={(e) => { e.currentTarget.style.borderColor = "#E5E7EB"; }}
+                  />
+                </div>
+                <div>
+                  <label style={{ fontSize: "13px", fontWeight: "600", color: "#374151", display: "block", marginBottom: "6px" }}>Price Unit</label>
+                  <select
+                    value={serviceForm.priceUnit}
+                    onChange={(e) => handleFormChange("priceUnit", e.target.value)}
+                    style={{
+                      width: "100%",
+                      padding: "10px 40px 10px 14px",
+                      border: "2px solid #E5E7EB",
+                      borderRadius: "10px",
+                      fontSize: "14px",
+                      outline: "none",
+                      backgroundColor: "white",
+                      cursor: "pointer",
+                      appearance: "none",
+                      WebkitAppearance: "none",
+                      backgroundImage: `url('data:image/svg+xml;utf8,<svg fill="none" stroke="%236B7280" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M6 9l6 6 6-6"></path></svg>')`,
+                      backgroundRepeat: "no-repeat",
+                      backgroundPosition: "right 12px center",
+                      backgroundSize: "16px",
+                    }}
+                  >
+                    {["per hour", "per visit", "per day", "fixed rate"].map((u) => (
+                      <option key={u} value={u}>{u}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Estimated Duration */}
+              <div>
+                <label style={{ fontSize: "13px", fontWeight: "600", color: "#374151", display: "block", marginBottom: "6px" }}>Estimated Duration</label>
+                <input
+                  type="text"
+                  value={serviceForm.estimatedDuration}
+                  onChange={(e) => handleFormChange("estimatedDuration", e.target.value)}
+                  placeholder="e.g., 2-3 hours"
+                  style={{ width: "100%", padding: "10px 14px", border: "2px solid #E5E7EB", borderRadius: "10px", fontSize: "14px", outline: "none", boxSizing: "border-box" as const }}
+                  onFocus={(e) => { e.currentTarget.style.borderColor = "#00BF63"; }}
+                  onBlur={(e) => { e.currentTarget.style.borderColor = "#E5E7EB"; }}
+                />
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: "12px", marginTop: "28px" }}>
+              <button
+                onClick={() => setShowServiceModal(false)}
+                style={{ padding: "10px 20px", borderRadius: "10px", border: "1px solid #E5E7EB", backgroundColor: "white", color: "#6B7280", fontSize: "14px", fontWeight: "600", cursor: "pointer" }}
+                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "#F9FAFB"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "white"; }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleServiceSave}
+                style={{ padding: "10px 24px", borderRadius: "10px", border: "none", backgroundColor: "#00BF63", color: "white", fontSize: "14px", fontWeight: "600", cursor: "pointer", boxShadow: "0 4px 12px rgba(0,191,99,0.3)" }}
+                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "#059669"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "#00BF63"; }}
+              >
+                {editingServiceId ? "Save Changes" : "Add Service"}
+              </button>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }

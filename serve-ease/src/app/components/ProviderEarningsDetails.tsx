@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router";
+import { jsPDF } from "jspdf";
+import autoTable from "jspdf-autotable";
 import {
   DollarSign,
   Clock,
@@ -8,10 +10,11 @@ import {
   Download,
   FileText,
   ChevronLeft,
-  Calendar,
+
   Filter,
   Eye,
   ChevronDown,
+  X,
 } from "lucide-react";
 
 // Styles object for reusability
@@ -115,7 +118,7 @@ const styles = {
   },
   select: {
     width: "100%",
-    padding: "12px 16px",
+    padding: "12px 36px 12px 16px",
     borderRadius: "10px",
     border: "2px solid #E5E7EB",
     fontSize: "14px",
@@ -124,6 +127,7 @@ const styles = {
     outline: "none",
     cursor: "pointer",
     backgroundColor: "white",
+    appearance: "none" as const,
   },
   button: {
     padding: "12px 20px",
@@ -215,12 +219,24 @@ export function ProviderEarningsDetails() {
   const [serviceCategory, setServiceCategory] = useState("all");
   const [paymentStatus, setPaymentStatus] = useState("all");
   const [isExportDropdownOpen, setIsExportDropdownOpen] = useState(false);
+  const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
 
-  // Sample data
-  const totalEarnings = 12450;
-  const pendingEarnings = 1530;
-  const inProcessing = 850;
-  const paidOut = 10920;
+  const formatCurrency = (value: number) =>
+    new Intl.NumberFormat("en-PH", {
+      style: "currency",
+      currency: "PHP",
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(value);
+
+  const formatCurrencyForPDF = (value: number): string => {
+    // Format as plain number with thousand separators and 2 decimals
+    // Avoids ₱ symbol rendering issues in PDF
+    return new Intl.NumberFormat("en-PH", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(value);
+  };
 
   const transactions: Transaction[] = [
     {
@@ -320,6 +336,165 @@ export function ProviderEarningsDetails() {
       status: "completed",
     },
   ];
+
+  const filteredTransactions = transactions.filter((tx) => {
+    const txDate = new Date(tx.date);
+    const start = new Date(dateFrom);
+    const end = new Date(dateTo);
+    const inDateRange = txDate >= start && txDate <= end;
+
+    let categoryMatch = true;
+    if (serviceCategory !== "all") {
+      const mapping: Record<string, string> = {
+        "house-cleaning": "House Cleaning",
+        plumbing: "Plumbing",
+        electrical: "Electrical",
+        aircon: "Aircon Services",
+      };
+      categoryMatch = tx.serviceType === mapping[serviceCategory];
+    }
+
+    const statusMatch = paymentStatus === "all" || tx.status === paymentStatus;
+
+    return inDateRange && categoryMatch && statusMatch;
+  });
+
+  const totalEarnings = filteredTransactions.reduce((sum, tx) => sum + tx.netEarnings, 0);
+  const pendingEarnings = filteredTransactions.filter(tx => tx.status === 'pending').reduce((sum, tx) => sum + tx.netEarnings, 0);
+  const inProcessing = filteredTransactions.filter(tx => tx.status === 'processing').reduce((sum, tx) => sum + tx.netEarnings, 0);
+  const paidOut = filteredTransactions.filter(tx => tx.status === 'completed').reduce((sum, tx) => sum + tx.netEarnings, 0);
+
+  const handleExportCSV = () => {
+    const headers = ["Date", "Booking Ref", "Customer Name", "Service Type", "Amount Charged", "Platform Fee", "Tips", "Net Earnings", "Status"];
+    const csvContent = [
+      headers.join(","),
+      ...filteredTransactions.map(tx => [
+        `"${tx.date}"`,
+        `"${tx.bookingRef}"`,
+        `"${tx.customerName}"`,
+        `"${tx.serviceType}"`,
+        tx.amountCharged,
+        tx.platformFee,
+        tx.tips,
+        tx.netEarnings,
+        `"${tx.status}"`
+      ].join(","))
+    ].join("\n");
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement("a");
+    if (link.download !== undefined) {
+      const url = URL.createObjectURL(blob);
+      link.setAttribute("href", url);
+      link.setAttribute("download", `earnings_${dateFrom}_to_${dateTo}.csv`);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+  };
+
+  const handleExportPDF = () => {
+    const doc = new jsPDF({ orientation: "landscape", unit: "pt", format: "a4" });
+    const now = new Date();
+    const generatedAt = now.toLocaleString("en-PH", {
+      dateStyle: "medium",
+      timeStyle: "short",
+    });
+
+    const serviceCategoryLabel =
+      serviceCategory === "all"
+        ? "All Services"
+        : {
+            "house-cleaning": "House Cleaning",
+            plumbing: "Plumbing",
+            electrical: "Electrical",
+            aircon: "Aircon Services",
+          }[serviceCategory] ?? serviceCategory;
+
+    const paymentStatusLabel =
+      paymentStatus === "all"
+        ? "All Statuses"
+        : {
+            completed: "Paid Out",
+            processing: "Processing",
+            pending: "Pending",
+          }[paymentStatus] ?? paymentStatus;
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(18);
+    doc.text("Earnings Details Report", 40, 42);
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    doc.text(`Generated: ${generatedAt}`, 40, 60);
+    doc.text(`Date Range: ${dateFrom} to ${dateTo}`, 40, 74);
+    doc.text(`Service Category: ${serviceCategoryLabel}`, 40, 88);
+    doc.text(`Payment Status: ${paymentStatusLabel}`, 40, 102);
+
+    doc.setFont("helvetica", "bold");
+    doc.text(
+      `Summary - Total: ₱${formatCurrencyForPDF(totalEarnings)} | Pending: ₱${formatCurrencyForPDF(pendingEarnings)} | Processing: ₱${formatCurrencyForPDF(inProcessing)} | Paid Out: ₱${formatCurrencyForPDF(paidOut)}`,
+      40,
+      120
+    );
+
+    autoTable(doc, {
+      startY: 136,
+      head: [["Date", "Booking Ref", "Customer", "Service", "Amount (₱)", "Fee (₱)", "Tips (₱)", "Net (₱)", "Status"]],
+      body: filteredTransactions.map((tx) => [
+        tx.date,
+        tx.bookingRef,
+        tx.customerName,
+        tx.serviceType,
+        formatCurrencyForPDF(tx.amountCharged),
+        formatCurrencyForPDF(tx.platformFee),
+        tx.tips > 0 ? formatCurrencyForPDF(tx.tips) : "-",
+        formatCurrencyForPDF(tx.netEarnings),
+        getStatusLabel(tx.status),
+      ]),
+      styles: {
+        fontSize: 9,
+        cellPadding: 7,
+        halign: "right" as const,
+      },
+      columnStyles: {
+        0: { halign: "left" as const },
+        1: { halign: "center" as const },
+        2: { halign: "left" as const },
+        3: { halign: "left" as const },
+        8: { halign: "center" as const },
+      },
+      headStyles: {
+        fillColor: [0, 191, 99],
+        textColor: [255, 255, 255],
+        halign: "center" as const,
+        fontStyle: "bold",
+      },
+      theme: "grid",
+      didDrawPage: () => {
+        const pageSize = doc.internal.pageSize;
+        const pageWidth = pageSize.getWidth();
+        const pageHeight = pageSize.getHeight();
+
+        doc.setFontSize(9);
+        doc.setTextColor(110, 110, 110);
+        doc.text(
+          `Transactions Exported: ${filteredTransactions.length}`,
+          40,
+          pageHeight - 18
+        );
+        doc.text(
+          `Page ${doc.getCurrentPageInfo().pageNumber}`,
+          pageWidth - 80,
+          pageHeight - 18
+        );
+      },
+    });
+
+    const safeTimestamp = now.toISOString().replace(/[:.]/g, "-");
+    doc.save(`earnings_${dateFrom}_to_${dateTo}_${safeTimestamp}.pdf`);
+  };
 
   const getStatusStyle = (status: string) => {
     switch (status) {
@@ -515,44 +690,50 @@ export function ProviderEarningsDetails() {
             {/* Service Category */}
             <div>
               <label style={styles.filterLabel}>Service Category</label>
-              <select
-                value={serviceCategory}
-                onChange={(e) => setServiceCategory(e.target.value)}
-                style={styles.select}
-                onFocus={(e) => {
-                  e.currentTarget.style.borderColor = "#00BF63";
-                }}
-                onBlur={(e) => {
-                  e.currentTarget.style.borderColor = "#E5E7EB";
-                }}
-              >
-                <option value="all">All Services</option>
-                <option value="house-cleaning">House Cleaning</option>
-                <option value="plumbing">Plumbing</option>
-                <option value="electrical">Electrical</option>
-                <option value="aircon">Aircon Services</option>
-              </select>
+              <div style={{ position: "relative" }}>
+                <select
+                  value={serviceCategory}
+                  onChange={(e) => setServiceCategory(e.target.value)}
+                  style={styles.select}
+                  onFocus={(e) => {
+                    e.currentTarget.style.borderColor = "#00BF63";
+                  }}
+                  onBlur={(e) => {
+                    e.currentTarget.style.borderColor = "#E5E7EB";
+                  }}
+                >
+                  <option value="all">All Services</option>
+                  <option value="house-cleaning">House Cleaning</option>
+                  <option value="plumbing">Plumbing</option>
+                  <option value="electrical">Electrical</option>
+                  <option value="aircon">Aircon Services</option>
+                </select>
+                <ChevronDown style={{ position: "absolute", right: "12px", top: "50%", transform: "translateY(-50%)", width: "16px", height: "16px", color: "#6B7280", pointerEvents: "none" }} />
+              </div>
             </div>
 
             {/* Payment Status */}
             <div>
               <label style={styles.filterLabel}>Payment Status</label>
-              <select
-                value={paymentStatus}
-                onChange={(e) => setPaymentStatus(e.target.value)}
-                style={styles.select}
-                onFocus={(e) => {
-                  e.currentTarget.style.borderColor = "#00BF63";
-                }}
-                onBlur={(e) => {
-                  e.currentTarget.style.borderColor = "#E5E7EB";
-                }}
-              >
-                <option value="all">All Statuses</option>
-                <option value="completed">Paid Out</option>
-                <option value="processing">Processing</option>
-                <option value="pending">Pending</option>
-              </select>
+              <div style={{ position: "relative" }}>
+                <select
+                  value={paymentStatus}
+                  onChange={(e) => setPaymentStatus(e.target.value)}
+                  style={styles.select}
+                  onFocus={(e) => {
+                    e.currentTarget.style.borderColor = "#00BF63";
+                  }}
+                  onBlur={(e) => {
+                    e.currentTarget.style.borderColor = "#E5E7EB";
+                  }}
+                >
+                  <option value="all">All Statuses</option>
+                  <option value="completed">Paid Out</option>
+                  <option value="processing">Processing</option>
+                  <option value="pending">Pending</option>
+                </select>
+                <ChevronDown style={{ position: "absolute", right: "12px", top: "50%", transform: "translateY(-50%)", width: "16px", height: "16px", color: "#6B7280", pointerEvents: "none" }} />
+              </div>
             </div>
 
             {/* Export Button */}
@@ -617,7 +798,7 @@ export function ProviderEarningsDetails() {
                       e.currentTarget.style.backgroundColor = "white";
                     }}
                     onClick={() => {
-                      console.log("Export as CSV");
+                      handleExportCSV();
                       setIsExportDropdownOpen(false);
                     }}
                   >
@@ -647,7 +828,7 @@ export function ProviderEarningsDetails() {
                       e.currentTarget.style.backgroundColor = "white";
                     }}
                     onClick={() => {
-                      console.log("Export as PDF");
+                      handleExportPDF();
                       setIsExportDropdownOpen(false);
                     }}
                   >
@@ -689,7 +870,7 @@ export function ProviderEarningsDetails() {
                 fontWeight: "600",
               }}
             >
-              {transactions.length} transactions
+              {filteredTransactions.length} transactions
             </span>
           </div>
 
@@ -718,7 +899,7 @@ export function ProviderEarningsDetails() {
                 </tr>
               </thead>
               <tbody>
-                {transactions.map((transaction, index) => (
+                {filteredTransactions.map((transaction, index) => (
                   <tr
                     key={transaction.id}
                     style={{
@@ -784,9 +965,9 @@ export function ProviderEarningsDetails() {
                       </span>
                     </td>
                     <td style={styles.tableCell}>
-                      <a
-                        href={`/provider/booking/${transaction.id}`}
-                        style={styles.viewLink}
+                      <button
+                        onClick={() => setSelectedTransaction(transaction)}
+                        style={{ ...styles.viewLink, background: "none", border: "none", cursor: "pointer", padding: 0 }}
                         onMouseEnter={(e) => {
                           e.currentTarget.style.color = "#059669";
                         }}
@@ -796,7 +977,7 @@ export function ProviderEarningsDetails() {
                       >
                         <Eye style={{ width: "14px", height: "14px" }} />
                         <span>View</span>
-                      </a>
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -805,6 +986,83 @@ export function ProviderEarningsDetails() {
           </div>
         </div>
       </div>
+
+      {/* Transaction Details Modal */}
+      {selectedTransaction && (
+        <div style={{
+          position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: "rgba(0,0,0,0.5)", zIndex: 50,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          padding: "20px"
+        }}>
+          <div style={{
+            backgroundColor: "white", borderRadius: "16px", padding: "32px",
+            width: "100%", maxWidth: "500px", boxShadow: "0 10px 25px rgba(0,0,0,0.1)",
+            position: "relative"
+          }}>
+            <button
+              onClick={() => setSelectedTransaction(null)}
+              style={{
+                position: "absolute", top: "24px", right: "24px",
+                background: "none", border: "none", cursor: "pointer",
+                padding: "4px", borderRadius: "8px"
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "#F3F4F6"}
+              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
+            >
+              <X style={{ width: "20px", height: "20px", color: "#6B7280" }} />
+            </button>
+            
+            <div style={{ marginBottom: "24px", paddingBottom: "16px", borderBottom: "1px solid #F3F4F6" }}>
+              <h2 style={{ fontSize: "20px", fontWeight: "bold", color: "#111827", marginBottom: "4px" }}>Transaction Detail</h2>
+              <p style={{ fontSize: "14px", color: "#6B7280", fontFamily: "monospace" }}>{selectedTransaction.bookingRef}</p>
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: "16px", marginBottom: "32px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between" }}>
+                <span style={{ color: "#6B7280", fontSize: "14px", fontWeight: "600" }}>Date</span>
+                <span style={{ color: "#111827", fontSize: "14px", fontWeight: "600" }}>{selectedTransaction.date}</span>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between" }}>
+                <span style={{ color: "#6B7280", fontSize: "14px", fontWeight: "600" }}>Customer</span>
+                <span style={{ color: "#111827", fontSize: "14px", fontWeight: "600" }}>{selectedTransaction.customerName}</span>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between" }}>
+                <span style={{ color: "#6B7280", fontSize: "14px", fontWeight: "600" }}>Service Type</span>
+                <span style={{ color: "#111827", fontSize: "14px", fontWeight: "600" }}>{selectedTransaction.serviceType}</span>
+              </div>
+              <div style={{ borderTop: "1px dashed #E5E7EB", margin: "8px 0" }}></div>
+              <div style={{ display: "flex", justifyContent: "space-between" }}>
+                <span style={{ color: "#6B7280", fontSize: "14px", fontWeight: "600" }}>Amount Charged</span>
+                <span style={{ color: "#111827", fontSize: "14px", fontWeight: "600" }}>₱{selectedTransaction.amountCharged.toLocaleString()}</span>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between" }}>
+                <span style={{ color: "#6B7280", fontSize: "14px", fontWeight: "600" }}>Platform Fee</span>
+                <span style={{ color: "#EF4444", fontSize: "14px", fontWeight: "600" }}>-₱{selectedTransaction.platformFee.toLocaleString()}</span>
+              </div>
+              {selectedTransaction.tips > 0 && (
+                <div style={{ display: "flex", justifyContent: "space-between" }}>
+                  <span style={{ color: "#6B7280", fontSize: "14px", fontWeight: "600" }}>Tips</span>
+                  <span style={{ color: "#00BF63", fontSize: "14px", fontWeight: "600" }}>+₱{selectedTransaction.tips.toLocaleString()}</span>
+                </div>
+              )}
+              <div style={{ display: "flex", justifyContent: "space-between", marginTop: "8px", paddingTop: "16px", borderTop: "1px solid #E5E7EB" }}>
+                <span style={{ color: "#111827", fontSize: "16px", fontWeight: "bold" }}>Net Earnings</span>
+                <span style={{ color: "#00BF63", fontSize: "18px", fontWeight: "800" }}>₱{selectedTransaction.netEarnings.toLocaleString()}</span>
+              </div>
+            </div>
+
+            <button
+              onClick={() => setSelectedTransaction(null)}
+              style={{ padding: "12px 20px", borderRadius: "10px", fontSize: "14px", fontWeight: "bold", cursor: "pointer", border: "none", width: "100%", backgroundColor: "#F3F4F6", color: "#374151" }}
+              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "#E5E7EB"}
+              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "#F3F4F6"}
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

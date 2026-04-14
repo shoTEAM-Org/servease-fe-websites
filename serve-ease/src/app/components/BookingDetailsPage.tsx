@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { useParams, useNavigate } from "react-router";
+import { useSearchParams } from "next/navigation";
 import {
   ArrowLeft,
   Phone,
   MessageCircle,
   MapPin,
   Calendar,
-  Clock,
+
   Navigation,
   CheckCircle,
   Upload,
@@ -14,7 +15,7 @@ import {
   AlertCircle,
   Image as ImageIcon,
   Send,
-  DollarSign,
+
   Star,
   X,
 } from "lucide-react";
@@ -363,7 +364,32 @@ const styles = {
 export function BookingDetailsPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const searchParams = useSearchParams();
   const [chatMessage, setChatMessage] = useState("");
+
+  const normalizeStatus = (value: string | null) => {
+    if (!value) {
+      return null;
+    }
+
+    return value.trim().toLowerCase().replace(/\s+/g, "-");
+  };
+
+  const selectedBooking = {
+    customerName: searchParams.get("customer"),
+    serviceType: searchParams.get("service"),
+    location: searchParams.get("location"),
+    status: normalizeStatus(searchParams.get("status")),
+    date: searchParams.get("date"),
+    time: searchParams.get("time"),
+  };
+
+  const hasSelectedBookingData = Boolean(
+    selectedBooking.customerName &&
+      selectedBooking.serviceType &&
+      selectedBooking.location &&
+      selectedBooking.status
+  );
 
   // Mock data - in real app, fetch based on id
   const booking = {
@@ -398,6 +424,24 @@ export function BookingDetailsPage() {
       yourEarnings: 1350,
     },
   };
+
+  const resolvedBooking = hasSelectedBookingData
+    ? {
+        ...booking,
+        status: selectedBooking.status || booking.status,
+        customer: {
+          ...booking.customer,
+          name: selectedBooking.customerName || booking.customer.name,
+        },
+        service: {
+          ...booking.service,
+          type: selectedBooking.serviceType || booking.service.type,
+          location: selectedBooking.location || booking.service.location,
+          date: selectedBooking.date || booking.service.date,
+          time: selectedBooking.time || booking.service.time,
+        },
+      }
+    : booking;
 
   const messages = [
     {
@@ -499,7 +543,8 @@ export function BookingDetailsPage() {
     }
   };
 
-  const initials = booking.customer.name
+  const displayBooking = resolvedBooking;
+  const initials = displayBooking.customer.name
     .split(" ")
     .map((n) => n[0])
     .join("")
@@ -519,9 +564,9 @@ export function BookingDetailsPage() {
             Back to Bookings
           </button>
           <div style={styles.headerRow}>
-            <h1 style={styles.pageTitle}>{booking.refNumber}</h1>
-            <div style={getStatusBadgeStyle(booking.status)}>
-              {getStatusLabel(booking.status)}
+            <h1 style={styles.pageTitle}>{displayBooking.refNumber}</h1>
+            <div style={getStatusBadgeStyle(displayBooking.status)}>
+              {getStatusLabel(displayBooking.status)}
             </div>
           </div>
         </div>
@@ -564,19 +609,19 @@ export function BookingDetailsPage() {
               <div style={styles.customerSection}>
                 <div style={styles.avatar}>{initials}</div>
                 <div style={styles.customerInfo}>
-                  <div style={styles.customerName}>{booking.customer.name}</div>
+                  <div style={styles.customerName}>{displayBooking.customer.name}</div>
                   <div style={styles.rating}>
                     <Star size={16} fill="#FCD34D" color="#FCD34D" />
                     <span style={{ fontSize: "14px", fontWeight: "600", color: "#111827" }}>
-                      {booking.customer.rating}
+                      {displayBooking.customer.rating}
                     </span>
                     <span style={{ fontSize: "12px", color: "#9CA3AF" }}>
-                      ({booking.customer.totalReviews} reviews)
+                      ({displayBooking.customer.totalReviews} reviews)
                     </span>
                   </div>
                   <div style={styles.phoneNumber}>
                     <Phone size={14} />
-                    {booking.customer.phone}
+                    {displayBooking.customer.phone}
                   </div>
                   <div style={styles.buttonGroup}>
                     <button style={{ ...styles.button, ...styles.outlinedButton }}>
@@ -602,7 +647,7 @@ export function BookingDetailsPage() {
                 </div>
                 <div style={styles.detailContent}>
                   <div style={styles.detailLabel}>Service Type</div>
-                  <div style={styles.detailValue}>{booking.service.type}</div>
+                  <div style={styles.detailValue}>{displayBooking.service.type}</div>
                 </div>
               </div>
 
@@ -613,7 +658,7 @@ export function BookingDetailsPage() {
                 <div style={styles.detailContent}>
                   <div style={styles.detailLabel}>Date & Time</div>
                   <div style={styles.detailValue}>
-                    {booking.service.date} • {booking.service.time}
+                    {displayBooking.service.date} • {displayBooking.service.time}
                   </div>
                 </div>
               </div>
@@ -624,7 +669,7 @@ export function BookingDetailsPage() {
                 </div>
                 <div style={styles.detailContent}>
                   <div style={styles.detailLabel}>Location</div>
-                  <div style={styles.detailValue}>{booking.service.location}</div>
+                  <div style={styles.detailValue}>{displayBooking.service.location}</div>
                   <div style={styles.mapPlaceholder}>
                     <div style={{ textAlign: "center" }}>
                       <MapPin size={24} style={{ marginBottom: "8px" }} />
@@ -640,15 +685,15 @@ export function BookingDetailsPage() {
                 </div>
                 <div style={styles.detailContent}>
                   <div style={styles.detailLabel}>Description</div>
-                  <div style={styles.detailValue}>{booking.service.description}</div>
+                  <div style={styles.detailValue}>{displayBooking.service.description}</div>
                 </div>
               </div>
 
-              {booking.photos.length > 0 && (
+              {displayBooking.photos.length > 0 && (
                 <div style={{ marginTop: "16px" }}>
                   <div style={styles.detailLabel}>Photos</div>
                   <div style={styles.photoGrid}>
-                    {booking.photos.map((photo) => (
+                    {displayBooking.photos.map((photo) => (
                       <div key={photo.id} style={styles.photoItem}>
                         <ImageIcon size={24} color="#9CA3AF" />
                       </div>
@@ -663,7 +708,7 @@ export function BookingDetailsPage() {
                 </div>
                 <div style={styles.detailContent}>
                   <div style={styles.detailLabel}>Special Instructions</div>
-                  <div style={styles.detailValue}>{booking.service.instructions}</div>
+                  <div style={styles.detailValue}>{displayBooking.service.instructions}</div>
                 </div>
               </div>
 
@@ -677,11 +722,11 @@ export function BookingDetailsPage() {
               >
                 <div>
                   <div style={styles.detailLabel}>Estimated Duration</div>
-                  <div style={styles.detailValue}>{booking.service.estimatedDuration}</div>
+                  <div style={styles.detailValue}>{displayBooking.service.estimatedDuration}</div>
                 </div>
                 <div>
                   <div style={styles.detailLabel}>Actual Duration</div>
-                  <div style={styles.detailValue}>{booking.service.actualDuration}</div>
+                  <div style={styles.detailValue}>{displayBooking.service.actualDuration}</div>
                 </div>
               </div>
             </div>
@@ -696,28 +741,28 @@ export function BookingDetailsPage() {
               <div style={styles.pricingRow}>
                 <div style={styles.pricingLabel}>Service Fee</div>
                 <div style={styles.pricingValue}>
-                  ₱{booking.pricing.serviceFee.toLocaleString()}
+                  ₱{displayBooking.pricing.serviceFee.toLocaleString()}
                 </div>
               </div>
 
               <div style={styles.pricingRow}>
                 <div style={styles.pricingLabel}>Additional Charges</div>
                 <div style={styles.pricingValue}>
-                  ₱{booking.pricing.additionalCharges.toLocaleString()}
+                  ₱{displayBooking.pricing.additionalCharges.toLocaleString()}
                 </div>
               </div>
 
               <div style={styles.pricingRow}>
                 <div style={styles.pricingLabel}>Platform Fee (10%)</div>
                 <div style={styles.pricingValue}>
-                  -₱{booking.pricing.platformFee.toLocaleString()}
+                  -₱{displayBooking.pricing.platformFee.toLocaleString()}
                 </div>
               </div>
 
               <div style={styles.totalRow}>
                 <div style={styles.totalLabel}>Your Earnings</div>
                 <div style={styles.totalValue}>
-                  ₱{booking.pricing.yourEarnings.toLocaleString()}
+                  ₱{displayBooking.pricing.yourEarnings.toLocaleString()}
                 </div>
               </div>
             </div>
@@ -726,7 +771,7 @@ export function BookingDetailsPage() {
             <div style={styles.card}>
               <h2 style={styles.cardTitle}>Actions</h2>
 
-              {booking.status === "upcoming" && (
+              {displayBooking.status === "upcoming" && (
                 <>
                   <div style={styles.infoBox}>
                     <AlertCircle size={18} style={{ marginTop: "2px", flexShrink: 0 }} />
@@ -770,7 +815,7 @@ export function BookingDetailsPage() {
                 </>
               )}
 
-              {booking.status === "in-progress" && (
+              {displayBooking.status === "in-progress" && (
                 <>
                   <div style={styles.actionButtons}>
                     <button style={{ ...styles.button, ...styles.primaryButton }}>

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Clock, DollarSign, Calendar, FileText, User, Briefcase } from 'lucide-react';
+import { Clock, DollarSign, Calendar, User, Briefcase } from 'lucide-react';
 import logo from '@/assets/d5c1631be6e8531539bd8040a765725f4a4ddc2c.png';
 
 export function CounterOfferPage() {

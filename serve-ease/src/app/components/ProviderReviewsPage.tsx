@@ -7,9 +7,9 @@ import {
   X,
   Send,
   Info,
-  Upload,
+
   CheckCircle2,
-  AlertCircle,
+
 } from "lucide-react";
 
 // Styles object for reusability
@@ -202,7 +202,7 @@ export function ProviderReviewsPage() {
     "Other",
   ];
 
-  const reviews: Review[] = [
+  const initialReviews: Review[] = [
     {
       id: 1,
       customerName: "Maria S.",
@@ -262,6 +262,8 @@ export function ProviderReviewsPage() {
     },
   ];
 
+  const [reviews, setReviews] = useState<Review[]>(initialReviews);
+
   const tips = [
     {
       label: "Be professional",
@@ -297,8 +299,22 @@ export function ProviderReviewsPage() {
   };
 
   const handleRespondSubmit = () => {
-    if (response.trim().length === 0) return;
-    console.log("Response submitted:", { reviewId: respondModal?.id, response });
+    if (response.trim().length === 0 || !respondModal) return;
+    
+    // Update the review in our state
+    setReviews(prevReviews => 
+      prevReviews.map(review => {
+        if (review.id === respondModal.id) {
+          return {
+            ...review,
+            businessResponse: response
+          };
+        }
+        return review;
+      })
+    );
+    
+    console.log("Response submitted:", { reviewId: respondModal.id, response });
     setRespondModal(null);
     setResponse("");
   };
@@ -331,7 +347,7 @@ export function ProviderReviewsPage() {
         filtered = filtered.filter((r) => r.rating <= 3);
         break;
       case "Unanswered":
-        filtered = filtered.filter((r) => !r.businessResponse);
+        filtered = filtered.filter((r) => !r.businessResponse || r.businessResponse.trim() === "");
         break;
       case "All Reviews":
       default:

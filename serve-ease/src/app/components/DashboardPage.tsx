@@ -14,16 +14,14 @@ export function DashboardPage() {
   const quickActions = [
     { label: 'Set Availability', path: '/provider/availability', color: 'bg-green-600' },
     { label: 'View Calendar', path: '/provider/calendar', color: 'bg-blue-600' },
-    { label: 'Update Pricing', path: '/provider/edit-services', color: 'bg-purple-600' },
+    { label: 'Update Pricing', path: '/provider/edit-services?from=dashboard', color: 'bg-purple-600', from: 'dashboard' },
     { label: 'View Earnings', path: '/provider/earningsdashboard', color: 'bg-yellow-600' },
   ];
 
   const upcomingBookings = [
-    { time: '9:00 AM', customer: 'John Miller', service: 'Home Cleaning', location: '123 Oak St', status: 'Confirmed' },
-    { time: '11:30 AM', customer: 'Emily Davis', service: 'Lawn Care', location: '456 Pine Ave', status: 'Confirmed' },
-    { time: '2:00 PM', customer: 'Michael Brown', service: 'Pet Grooming', location: '789 Maple Dr', status: 'Pending' },
-    { time: '4:30 PM', customer: 'Sarah Wilson', service: 'Tutoring', location: '321 Elm St', status: 'Confirmed' },
-    { time: '6:00 PM', customer: 'David Lee', service: 'Tech Support', location: '654 Cedar Ln', status: 'Confirmed' },
+    { id: '3', time: '9:00 AM', date: 'March 27, 2026', customer: 'Anna Reyes', service: 'Toilet Repair', location: '789 Rizal Street, Makati', status: 'Upcoming' },
+    { id: '8', time: '11:30 AM', date: 'March 28, 2026', customer: 'Emily Davis', service: 'Pipe Leak Repair', location: '456 Pine Ave', status: 'Upcoming' },
+    { id: '12', time: '2:00 PM', date: 'March 29, 2026', customer: 'Michael Brown', service: 'Water Heater Installation', location: '789 Maple Dr', status: 'Upcoming' },
   ];
 
   const performanceMetrics = [
@@ -62,7 +60,14 @@ export function DashboardPage() {
           {quickActions.map((action) => (
             <button
               key={action.label}
-              onClick={() => navigate(action.path)}
+              onClick={() => {
+                if (action.from) {
+                  navigate(action.path, { state: { from: action.from } });
+                  return;
+                }
+
+                navigate(action.path);
+              }}
               className={`${action.color} text-white px-6 py-4 rounded-xl font-medium hover:opacity-90 transition-all shadow-sm hover:shadow-md`}
             >
               {action.label}
@@ -91,7 +96,7 @@ export function DashboardPage() {
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-lg font-bold text-gray-900">Upcoming Bookings</h2>
           <button
-            onClick={() => navigate('/provider/calendar')}
+            onClick={() => navigate('/provider/bookings?tab=upcoming')}
             className="text-green-600 text-sm font-medium hover:text-green-700 flex items-center gap-1"
           >
             View All
@@ -103,7 +108,7 @@ export function DashboardPage() {
           <table className="w-full">
             <thead>
               <tr className="border-b border-gray-200">
-                <th className="text-left text-xs font-bold text-gray-500 uppercase tracking-wider pb-3">Time</th>
+                <th className="text-left text-xs font-bold text-gray-500 uppercase tracking-wider pb-3">Date & Time</th>
                 <th className="text-left text-xs font-bold text-gray-500 uppercase tracking-wider pb-3">Customer Name</th>
                 <th className="text-left text-xs font-bold text-gray-500 uppercase tracking-wider pb-3">Service Type</th>
                 <th className="text-left text-xs font-bold text-gray-500 uppercase tracking-wider pb-3">Location</th>
@@ -114,21 +119,35 @@ export function DashboardPage() {
             <tbody>
               {upcomingBookings.map((booking, index) => (
                 <tr key={index} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
-                  <td className="py-4 text-sm font-medium text-gray-900">{booking.time}</td>
+                  <td className="py-4 text-sm font-medium text-gray-900">{booking.date} at {booking.time}</td>
                   <td className="py-4 text-sm text-gray-700">{booking.customer}</td>
                   <td className="py-4 text-sm text-gray-700">{booking.service}</td>
                   <td className="py-4 text-sm text-gray-600">{booking.location}</td>
                   <td className="py-4">
                     <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
-                      booking.status === 'Confirmed' 
-                        ? 'bg-green-100 text-green-700' 
+                      booking.status === 'Upcoming' || booking.status === 'Confirmed'
+                        ? 'bg-blue-100 text-blue-700' 
                         : 'bg-yellow-100 text-yellow-700'
                     }`}>
                       {booking.status}
                     </span>
                   </td>
                   <td className="py-4 text-right">
-                    <button className="text-green-600 hover:text-green-700 text-sm font-medium flex items-center gap-1 ml-auto">
+                    <button 
+                      onClick={() => {
+                        const searchParams = new URLSearchParams({
+                          customer: booking.customer,
+                          service: booking.service,
+                          location: booking.location,
+                          status: booking.status,
+                          date: booking.date,
+                          time: booking.time,
+                        });
+
+                        navigate(`/provider/booking-details/${booking.id}?${searchParams.toString()}`);
+                      }}
+                      className="text-green-600 hover:text-green-700 text-sm font-medium flex items-center gap-1 ml-auto cursor-pointer"
+                    >
                       <Eye className="w-4 h-4" />
                       View Details
                     </button>

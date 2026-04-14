@@ -14,8 +14,10 @@ import { DashboardPage } from "./components/DashboardPage";
 import { EditProfilePage } from "./components/EditProfilePage";
 import { EditServicesPricingPage } from "./components/EditServicesPricingPage";
 import { Layout } from "./components/Layout";
+import { LegalPage } from "./components/LegalPage";
 import { LoginPage } from "./components/LoginPage";
 import { MessagesPage } from "./components/MessagesPage";
+import { NotificationsPage } from "./components/NotificationsPage";
 import { NotificationPreferencesPage } from "./components/NotificationPreferencesPage";
 import { OnboardingPage } from "./components/OnboardingPage";
 import { PayoutConfirmationPage } from "./components/PayoutConfirmationPage";
@@ -27,12 +29,14 @@ import { ProviderEarningsDetails } from "./components/ProviderEarningsDetails";
 import { ProviderHelpCenterPage } from "./components/ProviderHelpCenterPage";
 import { ProviderPerformanceInsightsPage } from "./components/ProviderPerformanceInsightsPage";
 import { ProviderProfilePage } from "./components/ProviderProfilePage";
+import { CustomerProfilePage } from "./components/CustomerProfilePage";
 import { ProviderReviewsPage } from "./components/ProviderReviewsPage";
 import { ProviderSettingsPage } from "./components/ProviderSettingsPage";
 import { RequestPayoutPage } from "./components/RequestPayoutPage";
 import { SetAvailabilityPage } from "./components/SetAvailabilityPage";
 import { UnifiedBookingsPage } from "./components/UnifiedBookingsPage";
-import { Providers } from "./providers";
+import { ContactSupportPage } from "./components/ContactSupportPage";
+import { ProviderCommunityPage } from "./components/ProviderCommunityPage";
 import { RouteContextProvider } from "@/lib/react-router-compat";
 
 type RouteEntry = {
@@ -67,20 +71,31 @@ const ROUTES: RouteEntry[] = [
   { path: "/provider/analytics", component: ProviderAnalyticsPage, layout: true },
   { path: "/provider/calendar", component: CalendarPage, layout: true },
   { path: "/provider/availability", component: SetAvailabilityPage, layout: true },
+  { path: "/provider-agreement", component: () => <LegalPage title="Provider Agreement" lastUpdated="April 10, 2024" />, layout: true },
+  { path: "/terms-and-conditions", component: () => <LegalPage title="Terms and Conditions" lastUpdated="April 10, 2024" />, layout: true },
+  { path: "/privacy-policy", component: () => <LegalPage title="Privacy Policy" lastUpdated="April 10, 2024" />, layout: true },
   { path: "/provider/block-time", component: BlockTimePage, layout: true },
   { path: "/provider/payout", component: PayoutPage, layout: true },
   { path: "/provider/request-payout", component: RequestPayoutPage, layout: true },
   { path: "/provider/payout-confirmation", component: PayoutConfirmationPage, layout: true },
   { path: "/provider/profile", component: ProviderProfilePage, layout: true },
+  { path: "/provider/customer-profile/:id", component: CustomerProfilePage, layout: true },
   { path: "/provider/edit-profile", component: EditProfilePage, layout: true },
   { path: "/provider/edit-services", component: EditServicesPricingPage, layout: true },
   { path: "/provider/portfolio", component: PortfolioManagementPage, layout: true },
   { path: "/provider/settings", component: ProviderSettingsPage, layout: true },
   { path: "/provider/help-center", component: ProviderHelpCenterPage, layout: true },
+  { path: "/provider/contact-support", component: ContactSupportPage, layout: true },
+  { path: "/provider/community", component: ProviderCommunityPage, layout: true },
   { path: "/provider/messages", component: MessagesPage, layout: true },
   {
     path: "/provider/notification-preferences",
     component: NotificationPreferencesPage,
+    layout: true,
+  },
+  {
+    path: "/provider/notifications",
+    component: NotificationsPage,
     layout: true,
   },
 ];
@@ -173,5 +188,5 @@ export function RouteRenderer({ pathname }: { pathname: string }) {
     );
   }
 
-  return <Providers>{content}</Providers>;
+  return content;
 }
