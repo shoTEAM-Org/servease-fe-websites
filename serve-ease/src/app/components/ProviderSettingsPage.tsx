@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { User, Bell, Lock, Shield, Eye, EyeOff, ChevronRight, CreditCard, MapPin, Clock, DollarSign, Settings as SettingsIcon, Moon, Sun, HelpCircle, FileText, Users, LogOut, Mail, Trash2 } from "lucide-react";
 import { Link, useNavigate } from "react-router";
+import { setUserAuthenticated } from "../auth";
 
 const styles = {
   container: {
@@ -999,6 +1000,7 @@ export function ProviderSettingsPage() {
                 }}
                 onClick={() => {
                   setIsLogoutModalOpen(false);
+                  setUserAuthenticated(false);
                   navigate('/login');
                 }}
               >

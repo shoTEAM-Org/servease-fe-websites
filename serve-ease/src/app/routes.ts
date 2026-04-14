@@ -1,4 +1,4 @@
-import { createBrowserRouter } from "react-router";
+import { createBrowserRouter, Navigate } from "react-router";
 import { Layout } from "./components/Layout";
 import { LoginPage } from "./components/LoginPage";
 import { DashboardPage } from "./components/DashboardPage";
@@ -22,12 +22,29 @@ import { MessagesPage } from "./components/MessagesPage";
 import { NotificationPreferencesPage } from "./components/NotificationPreferencesPage";
 import { ProviderPerformanceInsightsPage } from "./components/ProviderPerformanceInsightsPage";
 import { OnboardingPage } from "./components/OnboardingPage";
+import { SignupPage } from "./components/signup";
 import { UnifiedBookingsPage } from "./components/UnifiedBookingsPage";
 import { BookingDetailsPage } from "./components/BookingDetailsPage";
 import { BookingRequestDetailsPage } from "./components/BookingRequestDetailsPage";
 import { CounterOfferModalPage } from "./components/CounterOfferModalPage";
 import { CancelBookingPage } from "./components/CancelBookingPage";
 import { ProviderAnalyticsPage } from "./components/ProviderAnalyticsPage";
+
+function isUserAuthenticated() {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  return window.localStorage.getItem("servease.isAuthenticated") === "true";
+}
+
+function RequireAuth({ children }: { children: JSX.Element }) {
+  if (!isUserAuthenticated()) {
+    return <Navigate replace to="/login" />;
+  }
+
+  return children;
+}
 
 export const router = createBrowserRouter([
   {
@@ -36,11 +53,19 @@ export const router = createBrowserRouter([
     children: [
       {
         path: "provider/dashboard",
-        Component: DashboardPage,
+        Component: () => (
+          <RequireAuth>
+            <DashboardPage />
+          </RequireAuth>
+        ),
       },
       {
         path: "provider/onboarding",
         Component: OnboardingPage,
+      },
+      {
+        path: "provider/apply",
+        Component: SignupPage,
       },
       {
         path: "provider/bookings",
@@ -144,9 +169,22 @@ export const router = createBrowserRouter([
       },
       {
         index: true,
-        Component: DashboardPage, // Default to dashboard
+        Component: () => <Navigate replace to="/login" />,
       },
     ],
+  },
+import { RegistrationSuccessPage } from "./components/RegistrationSuccessPage";
+  {
+    path: "/signup",
+    Component: SignupPage,
+  },
+  {
+    path: "/registration-success",
+    Component: RegistrationSuccessPage,
+  },
+  {
+    path: "/registration-sucess",
+    Component: RegistrationSuccessPage,
   },
   {
     path: "/login",

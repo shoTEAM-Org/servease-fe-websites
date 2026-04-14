@@ -1,6 +1,8 @@
 "use client";
 
 import type { ComponentType, ReactNode } from "react";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 
 import { BookingDetailsPage } from "./components/BookingDetailsPage";
 import { BookingRequestDetailsPage } from "./components/BookingRequestDetailsPage";
@@ -20,6 +22,7 @@ import { MessagesPage } from "./components/MessagesPage";
 import { NotificationsPage } from "./components/NotificationsPage";
 import { NotificationPreferencesPage } from "./components/NotificationPreferencesPage";
 import { OnboardingPage } from "./components/OnboardingPage";
+import { SignupPage } from "./components/signup";
 import { PayoutConfirmationPage } from "./components/PayoutConfirmationPage";
 import { PayoutPage } from "./components/PayoutPage";
 import { PortfolioManagementPage } from "./components/PortfolioManagementPage";
@@ -37,7 +40,9 @@ import { SetAvailabilityPage } from "./components/SetAvailabilityPage";
 import { UnifiedBookingsPage } from "./components/UnifiedBookingsPage";
 import { ContactSupportPage } from "./components/ContactSupportPage";
 import { ProviderCommunityPage } from "./components/ProviderCommunityPage";
+import { RegistrationSuccessPage } from "./components/RegistrationSuccessPage";
 import { RouteContextProvider } from "@/lib/react-router-compat";
+import { isUserAuthenticated } from "./auth";
 
 type RouteEntry = {
   component: ComponentType;
@@ -52,9 +57,12 @@ type MatchedRoute = {
 };
 
 const ROUTES: RouteEntry[] = [
-  { path: "/", component: DashboardPage, layout: true },
+  { path: "/", component: LoginPage },
   { path: "/login", component: LoginPage },
-  { path: "/provider/apply", component: OnboardingPage, layout: true },
+  { path: "/registration-success", component: RegistrationSuccessPage },
+  { path: "/registration-sucess", component: RegistrationSuccessPage },
+  { path: "/signup", component: SignupPage },
+  { path: "/provider/apply", component: SignupPage },
   { path: "/provider/dashboard", component: DashboardPage, layout: true },
   { path: "/provider/onboarding", component: OnboardingPage, layout: true },
   { path: "/provider/bookings", component: UnifiedBookingsPage, layout: true },
@@ -106,6 +114,10 @@ function normalizePath(pathname: string) {
   }
 
   return pathname !== "/" && pathname.endsWith("/") ? pathname.slice(0, -1) : pathname;
+}
+
+function isProtectedPath(pathname: string) {
+  return pathname === "/provider" || pathname.startsWith("/provider/");
 }
 
 function matchRoute(pathname: string): MatchedRoute | null {
@@ -163,10 +175,38 @@ function NotFoundPage() {
 }
 
 export function RouteRenderer({ pathname }: { pathname: string }) {
+  const router = useRouter();
   const matched = matchRoute(pathname);
+  const normalizedPath = normalizePath(pathname);
+  const requiresAuth = isProtectedPath(normalizedPath);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [authChecked, setAuthChecked] = useState(false);
+
+  useEffect(() => {
+    setIsAuthenticated(isUserAuthenticated());
+    setAuthChecked(true);
+  }, [pathname]);
+
+  useEffect(() => {
+    if (!authChecked) {
+      return;
+    }
+
+    if (requiresAuth && !isAuthenticated) {
+      router.replace("/login");
+    }
+  }, [authChecked, requiresAuth, isAuthenticated, router]);
 
   if (!matched) {
     return <NotFoundPage />;
+  }
+
+  if (requiresAuth && !authChecked) {
+    return null;
+  }
+
+  if (requiresAuth && !isAuthenticated) {
+    return <LoginPage />;
   }
 
   const PageComponent = matched.component;

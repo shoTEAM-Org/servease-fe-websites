@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router';
 import { Mail, Lock, Eye, EyeOff, ArrowRight, Calendar, DollarSign, Star } from 'lucide-react';
 import logo from '@/assets/d5c1631be6e8531539bd8040a765725f4a4ddc2c.png';
+import { setUserAuthenticated } from '../auth';
 
 export function LoginPage() {
   const navigate = useNavigate();
@@ -20,6 +21,7 @@ export function LoginPage() {
     // Simulate API call
     setTimeout(() => {
       if (email && password) {
+        setUserAuthenticated(true);
         // Success - navigate to dashboard
         navigate('/provider/dashboard');
       } else {
@@ -612,7 +614,7 @@ export function LoginPage() {
                 <p>
                   New provider?{' '}
                   <button
-                    onClick={() => navigate('/provider/apply')}
+                    onClick={() => navigate('/signup')}
                     style={applyLinkStyle}
                     className="apply-link"
                   >
