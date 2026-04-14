@@ -2,7 +2,6 @@
 
 import type { ReactNode } from "react";
 
-import { AuthProvider } from "./contexts/AuthContext";
 import { ProviderDataProvider } from "./context/ProviderDataContext";
 
 function GlobalFormStyle() {
@@ -84,11 +83,9 @@ function GlobalFormStyle() {
 
 export function Providers({ children }: { children: ReactNode }) {
   return (
-    <AuthProvider>
-      <ProviderDataProvider>
-        <GlobalFormStyle />
-        {children}
-      </ProviderDataProvider>
-    </AuthProvider>
+    <ProviderDataProvider>
+      <GlobalFormStyle />
+      {children}
+    </ProviderDataProvider>
   );
 }

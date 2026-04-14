@@ -12,7 +12,7 @@ import {
   Calendar,
 } from "lucide-react";
 import { ImageWithFallback } from "./figma/ImageWithFallback";
-import { useNavigate } from "@/lib/react-router-compat";
+import { useNavigate } from "react-router";
 import { useProviderData } from "../context/ProviderDataContext";
 
 const styles = {
@@ -87,16 +87,14 @@ export function ProviderProfilePage() {
     { icon: Award, label: "Top Rated", color: "#F59E0B", bg: "#FEF3C7" },
   ];
 
+  const services = [
+    { name: "House Cleaning", price: "₱500/hr" },
+    { name: "Deep Cleaning", price: "₱800/hr" },
+    { name: "Office Cleaning", price: "₱1,200/hr" },
+  ];
+
   const navigate = useNavigate();
   const providerData = useProviderData();
-  const activeServices = providerData.services.filter((service) => service.isActive);
-  const availableDays = Object.entries(providerData.providerData.availability)
-    .filter(([, schedule]) => schedule.available)
-    .map(([day]) => day);
-  const servicesPreview = activeServices.map((service) => ({
-    name: service.name,
-    price: service.baseRate ? `₱${service.baseRate}/${service.priceUnit}` : "Contact for price",
-  }));
 
   return (
     <div style={styles.container}>
@@ -190,33 +188,25 @@ export function ProviderProfilePage() {
                     letterSpacing: "-0.025em",
                   }}
                 >
-                  {providerData.profile.businessName}
+                  Juan Dela Cruz
                 </h1>
                 
                 {/* Additional Info - Location, Rating, Completed Jobs */}
                 <div style={{ display: "flex", alignItems: "center", gap: "16px", marginBottom: "12px" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                     <MapPin style={{ width: "16px", height: "16px", color: "#6B7280" }} />
-                    <span style={{ fontSize: "14px", color: "#6B7280" }}>
-                      {providerData.profile.serviceAreas}
-                    </span>
+                    <span style={{ fontSize: "14px", color: "#6B7280" }}>Metro Manila</span>
                   </div>
                   <div style={{ width: "4px", height: "4px", borderRadius: "50%", backgroundColor: "#D1D5DB" }} />
                   <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                     <Star style={{ width: "16px", height: "16px", fill: "#F59E0B", color: "#F59E0B" }} />
-                    <span style={{ fontSize: "14px", fontWeight: "600", color: "#111827" }}>
-                      {(providerData.profile.averageRating ?? 0).toFixed(1)}
-                    </span>
-                    <span style={{ fontSize: "14px", color: "#6B7280" }}>
-                      ({providerData.profile.totalReviews ?? 0} reviews)
-                    </span>
+                    <span style={{ fontSize: "14px", fontWeight: "600", color: "#111827" }}>4.9</span>
+                    <span style={{ fontSize: "14px", color: "#6B7280" }}>(247 reviews)</span>
                   </div>
                   <div style={{ width: "4px", height: "4px", borderRadius: "50%", backgroundColor: "#D1D5DB" }} />
                   <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                     <CheckCircle2 style={{ width: "16px", height: "16px", color: "#00BF63" }} />
-                    <span style={{ fontSize: "14px", color: "#6B7280" }}>
-                      {activeServices.length} active services
-                    </span>
+                    <span style={{ fontSize: "14px", color: "#6B7280" }}>532 completed jobs</span>
                   </div>
                 </div>
                 
@@ -310,7 +300,7 @@ export function ProviderProfilePage() {
                   color: "#111827",
                 }}
               >
-                {(providerData.profile.averageRating ?? 0).toFixed(1)}
+                4.9
               </span>
               <div style={{ display: "flex", gap: "2px" }}>
                 {[1, 2, 3, 4, 5].map((star) => (
@@ -319,16 +309,14 @@ export function ProviderProfilePage() {
                     style={{
                       width: "16px",
                       height: "16px",
-                      fill: star <= (providerData.profile.averageRating ?? 0) ? "#F59E0B" : "none",
+                      fill: star <= 4.9 ? "#F59E0B" : "none",
                       color: "#F59E0B",
                     }}
                   />
                 ))}
               </div>
             </div>
-            <p style={{ fontSize: "13px", color: "#6B7280" }}>
-              Based on {providerData.profile.totalReviews ?? 0} reviews
-            </p>
+            <p style={{ fontSize: "13px", color: "#6B7280" }}>Based on 247 reviews</p>
           </div>
 
           {/* Completed Bookings */}
@@ -358,10 +346,10 @@ export function ProviderProfilePage() {
             <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
               <CheckCircle2 style={{ width: "24px", height: "24px", color: "#00BF63" }} />
               <span style={{ fontSize: "32px", fontWeight: "bold", color: "#111827" }}>
-                {activeServices.length}
+                532
               </span>
             </div>
-            <p style={{ fontSize: "13px", color: "#6B7280" }}>Active service listings</p>
+            <p style={{ fontSize: "13px", color: "#6B7280" }}>All-time bookings</p>
           </div>
 
           {/* Years of Experience */}
@@ -390,9 +378,7 @@ export function ProviderProfilePage() {
             </p>
             <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
               <Briefcase style={{ width: "24px", height: "24px", color: "#00BF63" }} />
-              <span style={{ fontSize: "32px", fontWeight: "bold", color: "#111827" }}>
-                {providerData.profile.yearsExperience}
-              </span>
+              <span style={{ fontSize: "32px", fontWeight: "bold", color: "#111827" }}>8</span>
             </div>
             <p style={{ fontSize: "13px", color: "#6B7280" }}>Years in service</p>
           </div>
@@ -521,7 +507,10 @@ export function ProviderProfilePage() {
                     About Me
                   </h2>
                   <p style={{ fontSize: "15px", color: "#374151", lineHeight: "1.7" }}>
-                    {providerData.profile.bio}
+                    With over 8 years of professional cleaning experience, I take pride in
+                    delivering exceptional service to every client. I specialize in
+                    residential and commercial cleaning, using eco-friendly products and
+                    proven techniques to ensure your space is spotless and healthy.
                   </p>
                   <p
                     style={{
@@ -531,8 +520,10 @@ export function ProviderProfilePage() {
                       marginTop: "16px",
                     }}
                   >
-                    Verification status: {providerData.profile.verificationStatus ?? "pending"}.
-                    Trust score: {providerData.profile.trustScore ?? 0}.
+                    I'm fully licensed, insured, and committed to providing reliable,
+                    professional service. Customer satisfaction is my top priority, and I
+                    work closely with each client to meet their specific needs and
+                    preferences.
                   </p>
                 </div>
 
@@ -588,7 +579,7 @@ export function ProviderProfilePage() {
                     Service Categories
                   </h3>
                   <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-                    {servicesPreview.map((service, index) => (
+                    {services.map((service, index) => (
                       <div
                         key={index}
                         style={{
@@ -642,7 +633,7 @@ export function ProviderProfilePage() {
                   <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                     <MapPin style={{ width: "18px", height: "18px", color: "#00BF63" }} />
                     <span style={{ fontSize: "14px", color: "#374151" }}>
-                      {providerData.profile.serviceAreas}
+                      Metro Manila, Philippines
                     </span>
                   </div>
                 </div>
@@ -662,15 +653,13 @@ export function ProviderProfilePage() {
                   <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
                     <Calendar style={{ width: "18px", height: "18px", color: "#00BF63" }} />
                     <span style={{ fontSize: "14px", color: "#374151" }}>
-                      {availableDays.length ? `${availableDays[0]} - ${availableDays[availableDays.length - 1]}` : "No weekly schedule"}
+                      Monday - Friday
                     </span>
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                     <Clock style={{ width: "18px", height: "18px", color: "#00BF63" }} />
                     <span style={{ fontSize: "14px", color: "#374151" }}>
-                      {availableDays.length
-                        ? `${providerData.providerData.availability[availableDays[0]].startTime} - ${providerData.providerData.availability[availableDays[0]].endTime}`
-                        : "Unavailable"}
+                      9:00 AM - 5:00 PM
                     </span>
                   </div>
                 </div>
