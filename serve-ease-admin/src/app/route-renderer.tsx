@@ -44,7 +44,8 @@ import { ServiceProviders } from "./pages/ServiceProviders";
 import { Services } from "./pages/Services";
 import { Settings } from "./pages/Settings";
 import { Transactions } from "./pages/Transactions";
-import { Broadcasts, Customers, Support } from "./pages/PlaceholderPages";
+import { Customers } from "./pages/Customers";
+import { Broadcasts, Support } from "./pages/PlaceholderPages";
 import { Login } from "./pages/Login";
 import { Navigate, RouteContextProvider } from "@/lib/react-router-compat";
 
