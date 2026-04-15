@@ -1,15 +1,11 @@
-import { useState, useMemo } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
+import { useEffect, useMemo, useState } from "react";
+import { Search, Star, TrendingUp, Users, CheckCircle, AlertCircle } from "lucide-react";
+import { useNavigate } from "@/lib/react-router-compat";
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Input } from "../components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "../components/ui/select";
+import { Skeleton } from "../components/ui/skeleton";
 import {
   Table,
   TableBody,
@@ -18,443 +14,395 @@ import {
   TableHeader,
   TableRow,
 } from "../components/ui/table";
-import { Search, Star, TrendingUp, Users, CheckCircle, AlertCircle, Upload, Download, FileText } from "lucide-react";
-import { useNavigate } from "@/lib/react-router-compat";
-import { useData } from "../../contexts/DataContext";
-import type { ProviderStatus, ServiceProvider } from "../../types";
-import { ProviderDetailsDrawer } from "../components/ProviderDetailsDrawer";
-import { CSVUploadModal } from "../components/CSVUploadModal";
+import { fetchAdminJson } from "../lib/adminApi";
 import { toast } from "sonner";
 
+type ProviderRow = {
+  id: string;
+  full_name: string;
+  email: string;
+  contact_number: string | null;
+  status: string;
+  created_at: string;
+  business_name: string;
+  average_rating: number;
+  booking_count: number;
+  verification_status: string | null;
+};
+
+type ProvidersResponse = {
+  providers: ProviderRow[];
+  total: number;
+  page: number;
+  limit: number;
+};
+
+const LIMIT = 20;
+
+function asString(value: unknown, fallback = ""): string {
+  return typeof value === "string" ? value : fallback;
+}
+
+function asNumber(value: unknown, fallback = 0): number {
+  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+}
+
+function normalizeProvider(raw: Partial<ProviderRow>): ProviderRow {
+  return {
+    id: asString(raw.id),
+    full_name: asString(raw.full_name, "—"),
+    email: asString(raw.email, "—"),
+    contact_number: typeof raw.contact_number === "string" ? raw.contact_number : null,
+    status: asString(raw.status, "inactive"),
+    created_at: asString(raw.created_at),
+    business_name: asString(raw.business_name, asString(raw.full_name, "—")),
+    average_rating: asNumber(raw.average_rating),
+    booking_count: asNumber(raw.booking_count),
+    verification_status: typeof raw.verification_status === "string" ? raw.verification_status : null,
+  };
+}
+
+function ProvidersSkeleton() {
+  return (
+    <>
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        {Array.from({ length: 4 }, (_, i) => (
+          <Skeleton key={i} className="h-28 w-full rounded-xl" />
+        ))}
+      </div>
+      <Skeleton className="h-[520px] w-full rounded-xl" />
+    </>
+  );
+}
+
+function LoadingNotice() {
+  return (
+    <Card className="border-blue-200 bg-blue-50">
+      <CardContent className="p-4 text-sm text-blue-700">
+        Loading providers...
+      </CardContent>
+    </Card>
+  );
+}
+
 export function ServiceProviders() {
-  const { serviceProviders, getCategoryById, updateProviderStatus } = useData();
   const navigate = useNavigate();
+  const [data, setData] = useState<ProvidersResponse | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [page, setPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState("all");
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [selectedProvider, setSelectedProvider] = useState<ServiceProvider | null>(null);
-  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
-  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+  const [togglingId, setTogglingId] = useState<string | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
 
-  const filteredProviders = useMemo(() => {
-    return serviceProviders.filter((provider) => {
-      const category = getCategoryById(provider.categoryId);
-      const matchesSearch =
-        provider.businessName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        provider.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        provider.contactPerson.toLowerCase().includes(searchTerm.toLowerCase());
+  useEffect(() => {
+    let cancelled = false;
 
-      const matchesCategory = categoryFilter === "all" || provider.categoryId === categoryFilter;
-      const matchesStatus = statusFilter === "all" || provider.status === statusFilter;
-
-      return matchesSearch && matchesCategory && matchesStatus;
-    });
-  }, [serviceProviders, searchTerm, categoryFilter, statusFilter, getCategoryById]);
-
-  const stats = useMemo(() => {
-    const avgRating = serviceProviders.reduce((sum, p) => sum + p.rating, 0) / serviceProviders.length;
-    const avgCompletionRate = serviceProviders.reduce((sum, p) => sum + p.completionRate, 0) / serviceProviders.length;
-    const totalBookings = serviceProviders.reduce((sum, p) => sum + p.totalBookings, 0);
-
-    return [
-      {
-        title: "Total Service Providers",
-        value: serviceProviders.length.toString(),
-        change: `${serviceProviders.filter((p) => p.status === "Active").length} active`,
-        icon: Users,
-        color: "text-[#16A34A]",
-        bgColor: "bg-[#DCFCE7]",
-      },
-      {
-        title: "Average Rating",
-        value: avgRating.toFixed(2),
-        change: "Platform average",
-        icon: Star,
-        color: "text-yellow-600",
-        bgColor: "bg-yellow-50",
-      },
-      {
-        title: "Avg Completion Rate",
-        value: `${avgCompletionRate.toFixed(1)}%`,
-        change: "Good performance",
-        icon: CheckCircle,
-        color: "text-[#16A34A]",
-        bgColor: "bg-[#DCFCE7]",
-      },
-      {
-        title: "Total Bookings",
-        value: totalBookings.toString(),
-        change: "All time",
-        icon: TrendingUp,
-        color: "text-blue-600",
-        bgColor: "bg-blue-50",
-      },
-    ];
-  }, [serviceProviders]);
-
-  const getStatusBadge = (status: ProviderStatus) => {
-    switch (status) {
-      case "Active":
-        return (
-          <Badge className="bg-[#DCFCE7] text-[#15803D] border-[#BBF7D0]">
-            <CheckCircle className="w-3 h-3 mr-1" />
-            Active
-          </Badge>
+    async function load() {
+      try {
+        setIsLoading(true);
+        setError(null);
+        const result = await fetchAdminJson<ProvidersResponse>(
+          `/api/admin/v1/users/providers?page=${page}&limit=${LIMIT}`
         );
-      case "Inactive":
-        return (
-          <Badge className="bg-gray-100 text-gray-700 border-gray-200">
-            <AlertCircle className="w-3 h-3 mr-1" />
-            Inactive
-          </Badge>
-        );
-      case "Suspended":
-        return (
-          <Badge className="bg-red-100 text-red-700 border-red-200">
-            <AlertCircle className="w-3 h-3 mr-1" />
-            Suspended
-          </Badge>
-        );
+        if (!cancelled) {
+          const providers = Array.isArray((result as { providers?: unknown[] }).providers)
+            ? (result as { providers: unknown[] }).providers.map((raw) =>
+                normalizeProvider((raw ?? {}) as Partial<ProviderRow>)
+              )
+            : [];
+          setData({
+            providers,
+            total: asNumber((result as { total?: unknown }).total, providers.length),
+            page: asNumber((result as { page?: unknown }).page, page),
+            limit: asNumber((result as { limit?: unknown }).limit, LIMIT),
+          });
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : "Failed to load providers.");
+        }
+      } finally {
+        if (!cancelled) {
+          setIsLoading(false);
+        }
+      }
     }
-  };
 
-  const handleViewDetails = (provider: ServiceProvider) => {
-    navigate(`/service-providers/${provider.id}`);
-  };
+    void load();
 
-  const handleCloseDrawer = () => {
-    setIsDrawerOpen(false);
-    // Add a small delay before clearing the selected provider to allow the close animation to complete
-    setTimeout(() => setSelectedProvider(null), 300);
-  };
+    return () => {
+      cancelled = true;
+    };
+  }, [page, refreshKey]);
 
-  const handleToggleStatus = (providerId: string, newStatus: ProviderStatus) => {
-    updateProviderStatus(providerId, newStatus);
-  };
-
-  const handleOpenUploadModal = () => {
-    setIsUploadModalOpen(true);
-  };
-
-  const handleCloseUploadModal = () => {
-    setIsUploadModalOpen(false);
-  };
-
-  const handleUploadCSV = async (file: File): Promise<void> => {
-    // Simulate file processing
-    return new Promise((resolve, reject) => {
-      setTimeout(() => {
-        // In a real implementation, you would:
-        // 1. Parse the CSV file
-        // 2. Validate the data
-        // 3. Send it to your backend API
-        // 4. Update the state with new data
-
-        // For now, just simulate success
-        resolve();
-      }, 2000);
-    });
-  };
-
-  const handleExportCSV = () => {
+  async function toggleStatus(provider: ProviderRow) {
+    const newStatus = asString(provider.status).toLowerCase() === "active" ? "suspended" : "active";
+    setTogglingId(provider.id);
     try {
-      // Prepare CSV headers
-      const headers = [
-        "Provider ID",
-        "Business Name",
-        "Category",
-        "Contact Person",
-        "Email",
-        "Phone",
-        "Location",
-        "Rating",
-        "Total Bookings",
-        "Completed Bookings",
-        "Completion Rate",
-        "Status",
-        "Total Revenue",
-        "Total Earnings",
-        "Joined Date",
-      ];
-
-      // Prepare CSV rows
-      const rows = filteredProviders.map((provider) => [
-        provider.id,
-        provider.businessName,
-        getCategoryById(provider.categoryId)?.name || "N/A",
-        provider.contactPerson,
-        provider.email,
-        provider.phone,
-        provider.location,
-        provider.rating,
-        provider.totalBookings,
-        provider.completedBookings,
-        `${provider.completionRate}%`,
-        provider.status,
-        `₱${provider.totalRevenue.toFixed(2)}`,
-        `₱${provider.totalEarnings.toFixed(2)}`,
-        new Date(provider.joinedDate).toLocaleDateString("en-US"),
-      ]);
-
-      // Create CSV content
-      const csvContent = [
-        headers.join(","),
-        ...rows.map((row) =>
-          row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(",")
-        ),
-      ].join("\n");
-
-      // Create blob and download
-      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-      const link = document.createElement("a");
-      const url = URL.createObjectURL(blob);
-      link.setAttribute("href", url);
-      link.setAttribute(
-        "download",
-        `service-providers-${new Date().toISOString().split("T")[0]}.csv`
-      );
-      link.style.visibility = "hidden";
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-
-      toast.success("CSV exported successfully", {
-        description: `${filteredProviders.length} providers exported`,
+      await fetchAdminJson<{ ok: boolean }>(`/api/admin/v1/users/providers/${provider.id}/status`, {
+        method: "PATCH",
+        body: JSON.stringify({ status: newStatus }),
       });
-    } catch (error) {
-      toast.error("Export failed", {
-        description: "Failed to export CSV file",
-      });
+      toast.success("Provider status updated.");
+      setRefreshKey((k) => k + 1);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to update provider status.");
+    } finally {
+      setTogglingId(null);
     }
-  };
+  }
 
-  const handleExportPDF = () => {
-    toast.info("PDF Export", {
-      description: "PDF export functionality will be available soon",
-    });
-  };
+  const providers = data?.providers ?? [];
+  const total = data?.total ?? 0;
+  const totalPages = Math.ceil(total / LIMIT);
+  const rangeStart = total === 0 ? 0 : (page - 1) * LIMIT + 1;
+  const rangeEnd = Math.min(page * LIMIT, total);
+
+  const filtered = useMemo(() => {
+    const needle = searchTerm.toLowerCase();
+    return providers.filter(
+      (p) =>
+        asString(p.business_name).toLowerCase().includes(needle) ||
+        asString(p.full_name).toLowerCase().includes(needle) ||
+        asString(p.email).toLowerCase().includes(needle) ||
+        asString(p.id).toLowerCase().includes(needle)
+    );
+  }, [providers, searchTerm]);
+
+  const activeCount = providers.filter((p) => asString(p.status).toLowerCase() === "active").length;
+  const totalBookings = providers.reduce((sum, p) => sum + p.booking_count, 0);
+  const avgRating =
+    providers.length > 0
+      ? providers.reduce((sum, p) => sum + Number(p.average_rating || 0), 0) / providers.length
+      : 0;
+  const approvedCount = providers.filter((p) => p.verification_status === "approved").length;
+
+  const stats = [
+    {
+      title: "Total Service Providers",
+      value: total.toLocaleString(),
+      change: "All registered providers",
+      icon: Users,
+      color: "text-[#16A34A]",
+      bgColor: "bg-[#DCFCE7]",
+    },
+    {
+      title: "Active (this page)",
+      value: activeCount.toString(),
+      change: `of ${providers.length} on this page`,
+      icon: CheckCircle,
+      color: "text-blue-600",
+      bgColor: "bg-blue-50",
+    },
+    {
+      title: "Avg Rating (this page)",
+      value: avgRating.toFixed(2),
+      change: "Based on provider profiles",
+      icon: Star,
+      color: "text-yellow-600",
+      bgColor: "bg-yellow-50",
+    },
+    {
+      title: "Approved Profiles",
+      value: approvedCount.toString(),
+      change: `Bookings: ${totalBookings.toLocaleString()}`,
+      icon: TrendingUp,
+      color: "text-purple-600",
+      bgColor: "bg-purple-50",
+    },
+  ];
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold text-gray-900">Service Providers</h1>
-        <p className="text-gray-500 mt-1">
-          Manage all service providers on the platform
-        </p>
+        <p className="text-gray-500 mt-1">Manage and monitor service providers on the platform</p>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        {stats.map((stat) => (
-          <Card key={stat.title}>
-            <CardContent className="p-6">
-              <div className="flex items-center gap-4">
-                <div className={`p-3 rounded-lg ${stat.bgColor}`}>
-                  <stat.icon className={`w-6 h-6 ${stat.color}`} />
-                </div>
-                <div className="flex-1">
-                  <p className="text-sm text-gray-500">{stat.title}</p>
-                  <p className="text-2xl font-bold text-gray-900 mt-1">{stat.value}</p>
-                  <p className="text-xs text-gray-400 mt-1">{stat.change}</p>
+      {error ? (
+        <Card className="border-red-200 bg-red-50">
+          <CardContent className="flex items-start gap-3 p-6 text-red-700">
+            <AlertCircle className="mt-0.5 h-5 w-5 flex-shrink-0" />
+            <div>
+              <p className="font-semibold">Failed to load providers</p>
+              <p className="mt-1 text-sm">{error}</p>
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {isLoading ? (
+        <>
+          <LoadingNotice />
+          <ProvidersSkeleton />
+        </>
+      ) : (
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+            {stats.map((stat) => (
+              <Card key={stat.title}>
+                <CardContent className="p-6">
+                  <div className="flex items-center gap-4">
+                    <div className={`p-3 rounded-lg ${stat.bgColor}`}>
+                      <stat.icon className={`w-6 h-6 ${stat.color}`} />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm text-gray-500">{stat.title}</p>
+                      <p className="text-2xl font-bold text-gray-900 mt-1">{stat.value}</p>
+                      <p className="text-xs text-gray-400 mt-1">{stat.change}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>All Service Providers</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="mb-6 max-w-md relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <Input
+                  placeholder="Search by business, owner, email, or ID..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-9"
+                />
+              </div>
+
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Provider ID</TableHead>
+                      <TableHead>Business Name</TableHead>
+                      <TableHead>Owner</TableHead>
+                      <TableHead>Email</TableHead>
+                      <TableHead>Phone</TableHead>
+                      <TableHead>Rating</TableHead>
+                      <TableHead>Bookings</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Action</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filtered.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={9} className="text-center py-8 text-gray-500">
+                          No service providers found
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      filtered.map((provider) => {
+                        const isActive = asString(provider.status).toLowerCase() === "active";
+                        const isToggling = togglingId === provider.id;
+                        return (
+                          <TableRow key={provider.id}>
+                            <TableCell>
+                              <span className="font-mono font-semibold text-[#16A34A] text-sm">
+                                {provider.id ? `${provider.id.slice(0, 8)}…` : "—"}
+                              </span>
+                            </TableCell>
+                            <TableCell>
+                              <span className="font-medium text-gray-900">{provider.business_name || "—"}</span>
+                            </TableCell>
+                            <TableCell>
+                              <span className="text-sm text-gray-600">{provider.full_name || "—"}</span>
+                            </TableCell>
+                            <TableCell>
+                              <span className="text-sm text-gray-600">{provider.email || "—"}</span>
+                            </TableCell>
+                            <TableCell>
+                              <span className="text-sm text-gray-600">{provider.contact_number || "—"}</span>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-1">
+                                <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
+                                <span className="font-semibold text-gray-900">
+                                  {Number(provider.average_rating || 0).toFixed(1)}
+                                </span>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <span className="font-semibold text-gray-900">
+                                {provider.booking_count.toLocaleString()}
+                              </span>
+                            </TableCell>
+                            <TableCell>
+                              {isActive ? (
+                                <Badge className="bg-[#DCFCE7] text-[#15803D] border-[#BBF7D0]">
+                                  <CheckCircle className="w-3 h-3 mr-1" />
+                                  Active
+                                </Badge>
+                              ) : (
+                                <Badge variant="secondary">{provider.status}</Badge>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-2">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="text-xs"
+                                  onClick={() => navigate(`/service-providers/${provider.id}`)}
+                                >
+                                  View
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant={isActive ? "destructive" : "outline"}
+                                  disabled={isToggling}
+                                  onClick={() => void toggleStatus(provider)}
+                                  className="text-xs"
+                                >
+                                  {isToggling
+                                    ? "Updating…"
+                                    : isActive
+                                    ? "Suspend"
+                                    : "Activate"}
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+
+              <div className="flex items-center justify-between mt-6">
+                <p className="text-sm text-gray-500">
+                  {total === 0
+                    ? "No providers"
+                    : `Showing ${rangeStart}–${rangeEnd} of ${total} providers`}
+                </p>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={page <= 1}
+                    onClick={() => setPage((p) => p - 1)}
+                  >
+                    Previous
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={page >= totalPages}
+                    onClick={() => setPage((p) => p + 1)}
+                  >
+                    Next
+                  </Button>
                 </div>
               </div>
             </CardContent>
           </Card>
-        ))}
-      </div>
-
-      {/* Filters and Table */}
-      <Card>
-        <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-2 sm:space-y-0 pb-4">
-          <CardTitle>All Service Providers</CardTitle>
-          <div className="flex flex-wrap items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleOpenUploadModal}
-              className="gap-2"
-            >
-              <Upload className="w-4 h-4" />
-              Import CSV
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleExportCSV}
-              className="gap-2"
-            >
-              <Download className="w-4 h-4" />
-              Export CSV
-            </Button>
-            <Button
-              size="sm"
-              onClick={handleExportPDF}
-              className="bg-[#00BF63] hover:bg-[#00A855] text-white gap-2"
-            >
-              <FileText className="w-4 h-4" />
-              Export PDF
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {/* Filters */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-            {/* Search */}
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-              <Input
-                placeholder="Search by name, ID, contact person..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-9"
-              />
-            </div>
-
-            {/* Category Filter */}
-            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-              <SelectTrigger>
-                <SelectValue placeholder="Filter by Category" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Categories</SelectItem>
-                <SelectItem value="Home Maintenance & Repair">Home Maintenance</SelectItem>
-                <SelectItem value="Beauty, Wellness & Personal Care">Beauty & Wellness</SelectItem>
-                <SelectItem value="Domestic & Cleaning Services">Cleaning Services</SelectItem>
-                <SelectItem value="Automotive & Tech Support">Auto & Tech</SelectItem>
-                <SelectItem value="Pet Services">Pet Services</SelectItem>
-                <SelectItem value="Events & Entertainment">Events</SelectItem>
-              </SelectContent>
-            </Select>
-
-            {/* Status Filter */}
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger>
-                <SelectValue placeholder="Filter by Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Statuses</SelectItem>
-                <SelectItem value="Active">Active</SelectItem>
-                <SelectItem value="Inactive">Inactive</SelectItem>
-                <SelectItem value="Suspended">Suspended</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Table */}
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Provider ID</TableHead>
-                  <TableHead>Business Name</TableHead>
-                  <TableHead>Category</TableHead>
-                  <TableHead>Contact Person</TableHead>
-                  <TableHead>Location</TableHead>
-                  <TableHead>Rating</TableHead>
-                  <TableHead>Bookings</TableHead>
-                  <TableHead>Completion Rate</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Action</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredProviders.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={10} className="text-center py-8 text-gray-500">
-                      No service providers found
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  filteredProviders.map((provider) => (
-                    <TableRow key={provider.id}>
-                      <TableCell>
-                        <span className="font-mono font-semibold text-[#16A34A]">
-                          {provider.id}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        <span className="font-medium text-gray-900">
-                          {provider.businessName}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        <span className="text-sm text-gray-600">
-                          {getCategoryById(provider.categoryId)?.name || "N/A"}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        <div>
-                          <p className="text-sm font-medium text-gray-900">
-                            {provider.contactPerson}
-                          </p>
-                          <p className="text-xs text-gray-500">{provider.email}</p>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <span className="text-sm text-gray-600">{provider.location}</span>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1">
-                          <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
-                          <span className="font-semibold text-gray-900">{provider.rating}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <span className="font-semibold text-gray-900">
-                          {provider.totalBookings}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        <Badge
-                          className={
-                            provider.completionRate >= 95
-                              ? "bg-[#DCFCE7] text-[#15803D] border-[#BBF7D0]"
-                              : provider.completionRate >= 90
-                              ? "bg-yellow-100 text-yellow-700 border-yellow-200"
-                              : "bg-red-100 text-red-700 border-red-200"
-                          }
-                        >
-                          {provider.completionRate}%
-                        </Badge>
-                      </TableCell>
-                      <TableCell>{getStatusBadge(provider.status)}</TableCell>
-                      <TableCell>
-                        <Button
-                          size="sm"
-                          onClick={() => handleViewDetails(provider)}
-                          className="bg-[#16A34A] hover:bg-[#15803D]"
-                        >
-                          View Details
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Provider Details Drawer */}
-      <ProviderDetailsDrawer
-        provider={selectedProvider}
-        isOpen={isDrawerOpen}
-        onClose={handleCloseDrawer}
-        categoryName={
-          selectedProvider
-            ? getCategoryById(selectedProvider.categoryId)?.name || "N/A"
-            : ""
-        }
-        onToggleStatus={handleToggleStatus}
-      />
-
-      {/* CSV Upload Modal */}
-      <CSVUploadModal
-        isOpen={isUploadModalOpen}
-        onClose={handleCloseUploadModal}
-        onUpload={handleUploadCSV}
-      />
+        </>
+      )}
     </div>
   );
 }

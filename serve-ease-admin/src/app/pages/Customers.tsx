@@ -7,6 +7,7 @@ import {
   UserCheck,
   Users,
 } from "lucide-react";
+import { useNavigate } from "@/lib/react-router-compat";
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
@@ -56,6 +57,7 @@ function CustomersSkeleton() {
 }
 
 export function Customers() {
+  const navigate = useNavigate();
   const [data, setData] = useState<CustomersResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -308,19 +310,29 @@ export function Customers() {
                               )}
                             </TableCell>
                             <TableCell>
-                              <Button
-                                size="sm"
-                                variant={isActive ? "destructive" : "outline"}
-                                disabled={isToggling}
-                                onClick={() => void toggleStatus(customer)}
-                                className="text-xs"
-                              >
-                                {isToggling
-                                  ? "Updating…"
-                                  : isActive
-                                  ? "Suspend"
-                                  : "Activate"}
-                              </Button>
+                              <div className="flex items-center gap-2">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="text-xs"
+                                  onClick={() => navigate(`/customers/${customer.id}`)}
+                                >
+                                  View
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant={isActive ? "destructive" : "outline"}
+                                  disabled={isToggling}
+                                  onClick={() => void toggleStatus(customer)}
+                                  className="text-xs"
+                                >
+                                  {isToggling
+                                    ? "Updating…"
+                                    : isActive
+                                    ? "Suspend"
+                                    : "Activate"}
+                                </Button>
+                              </div>
                             </TableCell>
                           </TableRow>
                         );

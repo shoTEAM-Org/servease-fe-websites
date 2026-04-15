@@ -30,21 +30,36 @@ function getStoredAuth(): StoredAuth | null {
 
 export async function fetchAdminJson<T>(
   path: string,
-  options: { method?: string; body?: string } = {}
+  options: { method?: string; body?: string; timeoutMs?: number } = {}
 ): Promise<T> {
   const storedAuth = getStoredAuth();
   if (!storedAuth?.accessToken) {
     throw new Error("No admin session found.");
   }
 
-  const response = await fetch(`${getApiBaseUrl()}${path}`, {
-    method: options.method ?? "GET",
-    headers: {
-      Authorization: `Bearer ${storedAuth.accessToken}`,
-      ...(options.body ? { "Content-Type": "application/json" } : {}),
-    },
-    ...(options.body ? { body: options.body } : {}),
-  });
+  const controller = new AbortController();
+  const timeoutMs = options.timeoutMs ?? 15000;
+  const timeout = window.setTimeout(() => controller.abort(), timeoutMs);
+
+  let response: Response;
+  try {
+    response = await fetch(`${getApiBaseUrl()}${path}`, {
+      method: options.method ?? "GET",
+      headers: {
+        Authorization: `Bearer ${storedAuth.accessToken}`,
+        ...(options.body ? { "Content-Type": "application/json" } : {}),
+      },
+      signal: controller.signal,
+      ...(options.body ? { body: options.body } : {}),
+    });
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") {
+      throw new Error("Request timed out. Please check if backend services are running.");
+    }
+    throw error;
+  } finally {
+    window.clearTimeout(timeout);
+  }
 
   const payload = (await response.json().catch(() => ({}))) as T & {
     message?: string;

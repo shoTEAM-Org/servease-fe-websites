@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
@@ -32,15 +32,39 @@ import {
   AlertTriangle,
   XCircle,
   Search,
-  MapPin,
   CreditCard,
   MessageSquare,
   TrendingUp,
   Calendar,
+  AlertCircle,
 } from "lucide-react";
+import { fetchAdminJson } from "../lib/adminApi";
+import { toast } from "sonner";
 
 type LiveStatus = "Scheduled" | "In Progress" | "Completed" | "Cancelled";
 type PaymentStatus = "Paid" | "Pending" | "Failed";
+
+type OngoingBooking = {
+  id: string;
+  booking_id: string;
+  customer_id?: string;
+  provider_id?: string;
+  customer_name?: string;
+  provider_name?: string;
+  service_title?: string;
+  service_description?: string;
+  category_id?: string;
+  status?: string;
+  payment_status?: string;
+  scheduled_at?: string;
+  created_at?: string;
+  amount?: number;
+  location?: string;
+};
+
+type OngoingServicesResponse = {
+  bookings: OngoingBooking[];
+};
 
 interface OngoingService {
   id: string;
@@ -56,141 +80,55 @@ interface OngoingService {
   amount: number;
 }
 
-const initialServices: OngoingService[] = [
-  {
-    id: "SVC-001",
-    bookingId: "BK-2026-001850",
-    customer: "Maria Santos",
-    provider: "HomeFixPro Manila",
-    category: "Home Maintenance & Repair",
-    startTime: "2026-03-04T09:00:00",
-    expectedCompletion: "2026-03-04T12:00:00",
-    liveStatus: "In Progress",
-    paymentStatus: "Paid",
-    location: "Makati City, Metro Manila",
-    amount: 3500,
-  },
-  {
-    id: "SVC-002",
-    bookingId: "BK-2026-001851",
-    customer: "Roberto Garcia",
-    provider: "Glow Beauty Spa",
-    category: "Beauty, Wellness & Personal Care",
-    startTime: "2026-03-04T10:00:00",
-    expectedCompletion: "2026-03-04T11:30:00",
-    liveStatus: "In Progress",
-    paymentStatus: "Paid",
-    location: "Quezon City, Metro Manila",
-    amount: 2800,
-  },
-  {
-    id: "SVC-003",
-    bookingId: "BK-2026-001852",
-    customer: "Ana Cruz",
-    provider: "Party Perfect Planners",
-    category: "Events & Entertainment",
-    startTime: "2026-03-04T08:00:00",
-    expectedCompletion: "2026-03-04T14:00:00",
-    liveStatus: "In Progress",
-    paymentStatus: "Paid",
-    location: "Pasig City, Metro Manila",
-    amount: 12500,
-  },
-  {
-    id: "SVC-004",
-    bookingId: "BK-2026-001853",
-    customer: "Gabriel Sanchez",
-    provider: "FitLife Wellness Center",
-    category: "Health & Fitness",
-    startTime: "2026-03-04T13:00:00",
-    expectedCompletion: "2026-03-04T14:00:00",
-    liveStatus: "Scheduled",
-    paymentStatus: "Paid",
-    location: "Taguig City, Metro Manila",
-    amount: 2000,
-  },
-  {
-    id: "SVC-005",
-    bookingId: "BK-2026-001854",
-    customer: "Carlos Aquino",
-    provider: "Pawsome Pet Care",
-    category: "Pet Services",
-    startTime: "2026-03-04T11:00:00",
-    expectedCompletion: "2026-03-04T12:30:00",
-    liveStatus: "In Progress",
-    paymentStatus: "Paid",
-    location: "Mandaluyong City, Metro Manila",
-    amount: 1500,
-  },
-  {
-    id: "SVC-006",
-    bookingId: "BK-2026-001855",
-    customer: "Jose Reyes",
-    provider: "GadgetFix Tech Services",
-    category: "Automotive & Tech Support",
-    startTime: "2026-03-04T14:00:00",
-    expectedCompletion: "2026-03-04T16:00:00",
-    liveStatus: "Scheduled",
-    paymentStatus: "Paid",
-    location: "Manila City, Metro Manila",
-    amount: 3500,
-  },
-  {
-    id: "SVC-007",
-    bookingId: "BK-2026-001856",
-    customer: "Fernando Lopez",
-    provider: "ElectroPro Electricians",
-    category: "Home Maintenance & Repair",
-    startTime: "2026-03-04T07:00:00",
-    expectedCompletion: "2026-03-04T10:00:00",
-    liveStatus: "Completed",
-    paymentStatus: "Paid",
-    location: "Paranaque City, Metro Manila",
-    amount: 3800,
-  },
-  {
-    id: "SVC-008",
-    bookingId: "BK-2026-001857",
-    customer: "Antonio Rivera",
-    provider: "Radiant Skin Clinic",
-    category: "Beauty, Wellness & Personal Care",
-    startTime: "2026-03-04T08:30:00",
-    expectedCompletion: "2026-03-04T10:00:00",
-    liveStatus: "Completed",
-    paymentStatus: "Paid",
-    location: "Quezon City, Metro Manila",
-    amount: 3500,
-  },
-  {
-    id: "SVC-009",
-    bookingId: "BK-2026-001858",
-    customer: "Angelica Ramos",
-    provider: "QuickFix Plumbing",
-    category: "Home Maintenance & Repair",
-    startTime: "2026-03-04T06:00:00",
-    expectedCompletion: "2026-03-04T09:00:00",
-    liveStatus: "In Progress",
-    paymentStatus: "Paid",
-    location: "Makati City, Metro Manila",
-    amount: 2800,
-  },
-  {
-    id: "SVC-010",
-    bookingId: "BK-2026-001859",
-    customer: "Luisa Mendoza",
-    provider: "Happy Paws Veterinary",
-    category: "Pet Services",
-    startTime: "2026-03-04T15:00:00",
-    expectedCompletion: "2026-03-04T16:30:00",
-    liveStatus: "Scheduled",
-    paymentStatus: "Paid",
-    location: "Pasay City, Metro Manila",
-    amount: 2800,
-  },
-];
+function asString(value: unknown, fallback = ""): string {
+  return typeof value === "string" ? value : fallback;
+}
+
+function asNumber(value: unknown, fallback = 0): number {
+  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+}
+
+function toLiveStatus(status: string): LiveStatus {
+  const s = status.toLowerCase();
+  if (s === "confirmed" || s === "pending") return "Scheduled";
+  if (s === "in_progress" || s === "in progress") return "In Progress";
+  if (s === "completed") return "Completed";
+  return "Cancelled";
+}
+
+function toPaymentStatus(status: string): PaymentStatus {
+  const s = status.toLowerCase();
+  if (s === "paid" || s === "completed") return "Paid";
+  if (s === "failed") return "Failed";
+  return "Pending";
+}
+
+function addHours(iso: string, hours = 2): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return iso;
+  date.setHours(date.getHours() + hours);
+  return date.toISOString();
+}
+
+function mapBookingToService(raw: OngoingBooking): OngoingService {
+  const scheduled = asString(raw.scheduled_at || raw.created_at);
+  return {
+    id: asString(raw.id),
+    bookingId: asString(raw.booking_id, asString(raw.id)),
+    customer: asString(raw.customer_name, "Unknown Customer"),
+    provider: asString(raw.provider_name, "Unknown Provider"),
+    category: asString(raw.category_id, "General Services"),
+    startTime: scheduled,
+    expectedCompletion: addHours(scheduled, 2),
+    liveStatus: toLiveStatus(asString(raw.status, "scheduled")),
+    paymentStatus: toPaymentStatus(asString(raw.payment_status, "pending")),
+    location: asString(raw.location, "Metro Manila"),
+    amount: asNumber(raw.amount, 0),
+  };
+}
 
 export function OngoingServices() {
-  const [services, setServices] = useState<OngoingService[]>(initialServices);
+  const [services, setServices] = useState<OngoingService[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -202,6 +140,41 @@ export function OngoingServices() {
   const [cancelReason, setCancelReason] = useState("");
   const [escalationReason, setEscalationReason] = useState("");
   const [contactMessage, setContactMessage] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function load() {
+      try {
+        setIsLoading(true);
+        setError(null);
+        const result = await fetchAdminJson<OngoingServicesResponse>("/api/admin/v1/operations/ongoing");
+        if (!cancelled) {
+          const raw = Array.isArray((result as { bookings?: unknown[] }).bookings)
+            ? ((result as { bookings: unknown[] }).bookings as OngoingBooking[])
+            : [];
+          setServices(raw.map((booking) => mapBookingToService(booking)));
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : "Failed to load ongoing services.");
+        }
+      } finally {
+        if (!cancelled) {
+          setIsLoading(false);
+        }
+      }
+    }
+
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, [refreshKey]);
 
   const filteredServices = services.filter((service) => {
     const matchesSearch =
@@ -211,8 +184,7 @@ export function OngoingServices() {
 
     const matchesCategory = categoryFilter === "all" || service.category === categoryFilter;
     const matchesStatus = statusFilter === "all" || service.liveStatus === statusFilter;
-    const matchesLocation =
-      locationFilter === "all" || service.location.includes(locationFilter);
+    const matchesLocation = locationFilter === "all" || service.location.includes(locationFilter);
 
     return matchesSearch && matchesCategory && matchesStatus && matchesLocation;
   });
@@ -261,6 +233,15 @@ export function OngoingServices() {
       bgColor: "bg-green-50",
     },
   ];
+
+  const categories = useMemo(
+    () => Array.from(new Set(services.map((s) => s.category))).sort(),
+    [services]
+  );
+  const locations = useMemo(
+    () => Array.from(new Set(services.map((s) => s.location))).sort(),
+    [services]
+  );
 
   const getStatusBadge = (status: LiveStatus) => {
     switch (status) {
@@ -339,70 +320,67 @@ export function OngoingServices() {
     setContactModalOpen(true);
   };
 
-  const handleConfirmCancel = () => {
+  const handleConfirmCancel = async () => {
     if (!selectedService || !cancelReason.trim()) {
-      alert("Please provide a cancellation reason");
+      toast.error("Please provide a cancellation reason.");
       return;
     }
 
-    setServices((prev) =>
-      prev.map((s) => (s.id === selectedService.id ? { ...s, liveStatus: "Cancelled" } : s))
-    );
-
-    console.log("Audit Log:", {
-      action: "ADMIN_FORCE_CANCEL",
-      bookingId: selectedService.bookingId,
-      reason: cancelReason,
-      cancelledBy: "Admin User",
-      timestamp: new Date().toISOString(),
-    });
-
-    setCancelModalOpen(false);
-    setSelectedService(null);
-    alert("✅ Booking cancelled successfully!");
+    try {
+      setIsSubmitting(true);
+      await fetchAdminJson<{ status: string }>(`/api/admin/v1/operations/bookings/${selectedService.id}/status`, {
+        method: "PATCH",
+        body: JSON.stringify({ status: "cancelled" }),
+      });
+      toast.success("Booking cancelled successfully.");
+      setCancelModalOpen(false);
+      setSelectedService(null);
+      setRefreshKey((k) => k + 1);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to cancel booking.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  const handleConfirmEscalate = () => {
+  const handleConfirmEscalate = async () => {
     if (!selectedService || !escalationReason.trim()) {
-      alert("Please provide an escalation reason");
+      toast.error("Please provide an escalation reason.");
       return;
     }
 
-    console.log("Audit Log:", {
-      action: "ESCALATE_TO_DISPUTE",
-      bookingId: selectedService.bookingId,
-      reason: escalationReason,
-      escalatedBy: "Admin User",
-      timestamp: new Date().toISOString(),
-    });
-
-    setEscalateModalOpen(false);
-    setSelectedService(null);
-    alert("✅ Case escalated to Disputes & Resolutions!");
+    try {
+      setIsSubmitting(true);
+      await fetchAdminJson<{ status: string }>(
+        `/api/admin/v1/operations/bookings/${selectedService.id}/disputes`,
+        {
+          method: "POST",
+          body: JSON.stringify({ reason: escalationReason.trim() }),
+        }
+      );
+      toast.success("Case escalated to disputes.");
+      setEscalateModalOpen(false);
+      setSelectedService(null);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to escalate dispute.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleSendMessage = () => {
     if (!selectedService || !contactMessage.trim()) {
-      alert("Please enter a message");
+      toast.error("Please enter a message.");
       return;
     }
-
-    console.log("Internal Message Log:", {
-      action: "ADMIN_CONTACT_PROVIDER",
-      bookingId: selectedService.bookingId,
-      provider: selectedService.provider,
-      message: contactMessage,
-      sentBy: "Admin User",
-      timestamp: new Date().toISOString(),
-    });
-
     setContactModalOpen(false);
     setSelectedService(null);
-    alert("✅ Message sent to service provider!");
+    toast.success("Message logged.");
   };
 
   const formatTime = (dateTime: string) => {
     const date = new Date(dateTime);
+    if (Number.isNaN(date.getTime())) return "—";
     return date.toLocaleTimeString("en-US", {
       hour: "2-digit",
       minute: "2-digit",
@@ -413,12 +391,21 @@ export function OngoingServices() {
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold text-gray-900">Ongoing Services</h1>
-        <p className="text-gray-500 mt-1">
-          Monitor active service bookings in real-time
-        </p>
+        <p className="text-gray-500 mt-1">Monitor active service bookings in real-time</p>
       </div>
 
-      {/* Stats */}
+      {error ? (
+        <Card className="border-red-200 bg-red-50">
+          <CardContent className="flex items-start gap-3 p-6 text-red-700">
+            <AlertCircle className="mt-0.5 h-5 w-5 flex-shrink-0" />
+            <div>
+              <p className="font-semibold">Failed to load ongoing services</p>
+              <p className="mt-1 text-sm">{error}</p>
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
+
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         {stats.map((stat) => (
           <Card key={stat.title}>
@@ -438,15 +425,12 @@ export function OngoingServices() {
         ))}
       </div>
 
-      {/* Filters and Table */}
       <Card>
         <CardHeader>
           <CardTitle>Active Service Bookings</CardTitle>
         </CardHeader>
         <CardContent>
-          {/* Filters */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-            {/* Search */}
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
               <Input
@@ -457,23 +441,20 @@ export function OngoingServices() {
               />
             </div>
 
-            {/* Category Filter */}
             <Select value={categoryFilter} onValueChange={setCategoryFilter}>
               <SelectTrigger>
                 <SelectValue placeholder="Filter by Category" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Categories</SelectItem>
-                <SelectItem value="Home Maintenance & Repair">Home Maintenance</SelectItem>
-                <SelectItem value="Beauty, Wellness & Personal Care">Beauty & Wellness</SelectItem>
-                <SelectItem value="Events & Entertainment">Events</SelectItem>
-                <SelectItem value="Pet Services">Pet Services</SelectItem>
-                <SelectItem value="Health & Fitness">Health & Fitness</SelectItem>
-                <SelectItem value="Automotive & Tech Support">Auto & Tech</SelectItem>
+                {categories.map((category) => (
+                  <SelectItem key={category} value={category}>
+                    {category}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
 
-            {/* Status Filter */}
             <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger>
                 <SelectValue placeholder="Filter by Status" />
@@ -487,41 +468,44 @@ export function OngoingServices() {
               </SelectContent>
             </Select>
 
-            {/* Location Filter */}
             <Select value={locationFilter} onValueChange={setLocationFilter}>
               <SelectTrigger>
-                <MapPin className="w-4 h-4 mr-2" />
                 <SelectValue placeholder="Filter by Location" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Locations</SelectItem>
-                <SelectItem value="Makati">Makati City</SelectItem>
-                <SelectItem value="Quezon">Quezon City</SelectItem>
-                <SelectItem value="Pasig">Pasig City</SelectItem>
-                <SelectItem value="Taguig">Taguig City</SelectItem>
-                <SelectItem value="Manila">Manila City</SelectItem>
+                {locations.map((location) => (
+                  <SelectItem key={location} value={location}>
+                    {location}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
 
-          {/* Table */}
-          <div className="overflow-x-auto">
-            <Table>
+          <div className="rounded-md border border-gray-200">
+            <Table className="min-w-[1280px]">
               <TableHeader>
                 <TableRow>
-                  <TableHead>Booking ID</TableHead>
-                  <TableHead>Customer</TableHead>
-                  <TableHead>Service Provider</TableHead>
-                  <TableHead>Category</TableHead>
-                  <TableHead>Start Time</TableHead>
-                  <TableHead>Expected Completion</TableHead>
-                  <TableHead>Live Status</TableHead>
-                  <TableHead>Payment Status</TableHead>
-                  <TableHead>Action</TableHead>
+                  <TableHead className="min-w-[150px] text-gray-700 font-semibold">Booking ID</TableHead>
+                  <TableHead className="min-w-[160px] text-gray-700 font-semibold">Customer</TableHead>
+                  <TableHead className="min-w-[190px] text-gray-700 font-semibold">Service Provider</TableHead>
+                  <TableHead className="min-w-[200px] text-gray-700 font-semibold">Category</TableHead>
+                  <TableHead className="min-w-[110px] text-gray-700 font-semibold">Start Time</TableHead>
+                  <TableHead className="min-w-[150px] text-gray-700 font-semibold">Expected Completion</TableHead>
+                  <TableHead className="min-w-[120px] text-gray-700 font-semibold">Live Status</TableHead>
+                  <TableHead className="min-w-[120px] text-gray-700 font-semibold">Payment Status</TableHead>
+                  <TableHead className="min-w-[140px] text-gray-700 font-semibold">Action</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredServices.length === 0 ? (
+                {isLoading ? (
+                  <TableRow>
+                    <TableCell colSpan={9} className="text-center py-8 text-gray-500">
+                      Loading services...
+                    </TableCell>
+                  </TableRow>
+                ) : filteredServices.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={9} className="text-center py-8 text-gray-500">
                       No services found
@@ -531,28 +515,22 @@ export function OngoingServices() {
                   filteredServices.map((service) => (
                     <TableRow key={service.id}>
                       <TableCell>
-                        <span className="font-mono font-semibold text-blue-600">
-                          {service.bookingId}
-                        </span>
+                        <span className="font-mono font-bold text-blue-700">{service.bookingId}</span>
                       </TableCell>
                       <TableCell>
                         <span className="font-medium text-gray-900">{service.customer}</span>
                       </TableCell>
                       <TableCell>
-                        <span className="text-sm text-gray-700">{service.provider}</span>
+                        <span className="text-sm font-medium text-gray-800">{service.provider}</span>
                       </TableCell>
                       <TableCell>
-                        <span className="text-sm text-gray-600">{service.category}</span>
+                        <span className="text-sm text-gray-800 whitespace-normal">{service.category}</span>
                       </TableCell>
                       <TableCell>
-                        <span className="text-sm text-gray-700">
-                          {formatTime(service.startTime)}
-                        </span>
+                        <span className="text-sm text-gray-700">{formatTime(service.startTime)}</span>
                       </TableCell>
                       <TableCell>
-                        <span className="text-sm text-gray-700">
-                          {formatTime(service.expectedCompletion)}
-                        </span>
+                        <span className="text-sm text-gray-700">{formatTime(service.expectedCompletion)}</span>
                       </TableCell>
                       <TableCell>{getStatusBadge(service.liveStatus)}</TableCell>
                       <TableCell>{getPaymentBadge(service.paymentStatus)}</TableCell>
@@ -595,7 +573,6 @@ export function OngoingServices() {
         </CardContent>
       </Card>
 
-      {/* Force Cancel Modal */}
       <Dialog open={cancelModalOpen} onOpenChange={setCancelModalOpen}>
         <DialogContent>
           <DialogHeader>
@@ -625,25 +602,13 @@ export function OngoingServices() {
               </div>
 
               <div>
-                <label className="text-sm font-medium text-gray-700 block mb-2">
-                  Cancellation Reason
-                </label>
+                <label className="text-sm font-medium text-gray-700 block mb-2">Cancellation Reason</label>
                 <textarea
                   className="w-full min-h-[100px] p-3 border rounded-lg resize-none"
                   placeholder="Enter reason for cancellation..."
                   value={cancelReason}
                   onChange={(e) => setCancelReason(e.target.value)}
                 />
-              </div>
-
-              <div className="p-3 bg-red-50 rounded-lg border border-red-200">
-                <div className="flex gap-2">
-                  <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0" />
-                  <p className="text-sm text-red-700">
-                    Both customer and provider will be notified. This action is logged in the audit
-                    trail.
-                  </p>
-                </div>
               </div>
             </div>
           )}
@@ -652,7 +617,7 @@ export function OngoingServices() {
             <Button variant="outline" onClick={() => setCancelModalOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={handleConfirmCancel} className="bg-red-600 hover:bg-red-700">
+            <Button onClick={() => void handleConfirmCancel()} className="bg-red-600 hover:bg-red-700" disabled={isSubmitting}>
               <XCircle className="w-4 h-4 mr-2" />
               Confirm Cancellation
             </Button>
@@ -660,14 +625,11 @@ export function OngoingServices() {
         </DialogContent>
       </Dialog>
 
-      {/* Escalate to Dispute Modal */}
       <Dialog open={escalateModalOpen} onOpenChange={setEscalateModalOpen}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Escalate to Dispute</DialogTitle>
-            <DialogDescription>
-              This will create a dispute case for admin review.
-            </DialogDescription>
+            <DialogDescription>This will create a dispute case for admin review.</DialogDescription>
           </DialogHeader>
 
           {selectedService && (
@@ -686,24 +648,13 @@ export function OngoingServices() {
               </div>
 
               <div>
-                <label className="text-sm font-medium text-gray-700 block mb-2">
-                  Escalation Reason
-                </label>
+                <label className="text-sm font-medium text-gray-700 block mb-2">Escalation Reason</label>
                 <textarea
                   className="w-full min-h-[100px] p-3 border rounded-lg resize-none"
                   placeholder="Enter reason for escalation..."
                   value={escalationReason}
                   onChange={(e) => setEscalationReason(e.target.value)}
                 />
-              </div>
-
-              <div className="p-3 bg-yellow-50 rounded-lg border border-yellow-200">
-                <div className="flex gap-2">
-                  <AlertTriangle className="w-5 h-5 text-yellow-600 flex-shrink-0" />
-                  <p className="text-sm text-yellow-700">
-                    The case will be moved to Disputes & Resolutions for full review.
-                  </p>
-                </div>
               </div>
             </div>
           )}
@@ -712,7 +663,7 @@ export function OngoingServices() {
             <Button variant="outline" onClick={() => setEscalateModalOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={handleConfirmEscalate} className="bg-orange-600 hover:bg-orange-700">
+            <Button onClick={() => void handleConfirmEscalate()} className="bg-orange-600 hover:bg-orange-700" disabled={isSubmitting}>
               <TrendingUp className="w-4 h-4 mr-2" />
               Escalate Case
             </Button>
@@ -720,14 +671,11 @@ export function OngoingServices() {
         </DialogContent>
       </Dialog>
 
-      {/* Contact Provider Modal */}
       <Dialog open={contactModalOpen} onOpenChange={setContactModalOpen}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Contact Service Provider</DialogTitle>
-            <DialogDescription>
-              Send an internal message to the service provider.
-            </DialogDescription>
+            <DialogDescription>Send an internal message to the service provider.</DialogDescription>
           </DialogHeader>
 
           {selectedService && (
@@ -753,15 +701,6 @@ export function OngoingServices() {
                   value={contactMessage}
                   onChange={(e) => setContactMessage(e.target.value)}
                 />
-              </div>
-
-              <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
-                <div className="flex gap-2">
-                  <MessageSquare className="w-5 h-5 text-blue-600 flex-shrink-0" />
-                  <p className="text-sm text-blue-700">
-                    This message will be logged in the internal messaging system.
-                  </p>
-                </div>
               </div>
             </div>
           )}

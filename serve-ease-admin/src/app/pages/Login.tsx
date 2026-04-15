@@ -288,10 +288,10 @@ export function Login() {
                 <p className="text-xs text-gray-500 text-center mb-3">Demo Credentials</p>
                 <div className="p-3 bg-gray-50 rounded-lg space-y-1 text-xs font-mono">
                   <p className="text-gray-700">
-                    <span className="text-gray-500">Email:</span> juan@servease.ph
+                    <span className="text-gray-500">Email:</span> testadmin@gmail.com
                   </p>
                   <p className="text-gray-700">
-                    <span className="text-gray-500">Password:</span> admin123
+                    <span className="text-gray-500">Password:</span> Password123!
                   </p>
                 </div>
               </div>

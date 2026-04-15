@@ -1,6 +1,5 @@
 import { useNavigate, useParams } from "@/lib/react-router-compat";
 import { useState } from "react";
-import { applications } from "./ProviderApplications";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
@@ -46,7 +45,7 @@ import {
 export function ProviderApplicationDetail() {
   const { applicationId } = useParams();
   const navigate = useNavigate();
-  const application = applications.find((app) => app.applicationId === applicationId);
+  const application = null;
 
   const [internalNotes, setInternalNotes] = useState("");
   const [notes, setNotes] = useState([

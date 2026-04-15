@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
@@ -20,13 +20,7 @@ import {
   TableHeader,
   TableRow,
 } from "../components/ui/table";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "../components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "../components/ui/dialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -41,23 +35,72 @@ import {
   Search,
   Plus,
   Edit,
-  Eye,
-  EyeOff,
   Grid3x3,
   CheckCircle,
   XCircle,
   Trash2,
-  GripVertical,
+  AlertCircle,
 } from "lucide-react";
-import { useData } from "../../contexts/DataContext";
+import { fetchAdminJson } from "../lib/adminApi";
+import { toast } from "sonner";
+
+type ApiCategory = {
+  id?: string;
+  name?: string;
+  description?: string | null;
+  is_active?: boolean | null;
+  icon?: string | null;
+  sort_order?: number | null;
+};
+
+type CategoriesResponse = {
+  categories: ApiCategory[];
+  total: number;
+  page: number;
+  limit: number;
+};
+
+type CategoryRow = {
+  id: string;
+  name: string;
+  description: string;
+  isActive: boolean;
+  icon: string;
+  sortOrder: number;
+};
+
+const LIMIT = 100;
+
+function asString(value: unknown, fallback = ""): string {
+  return typeof value === "string" ? value : fallback;
+}
+
+function asNumber(value: unknown, fallback = 0): number {
+  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+}
+
+function mapCategory(raw: ApiCategory, index: number): CategoryRow {
+  return {
+    id: asString(raw.id),
+    name: asString(raw.name, "Unnamed Category"),
+    description: asString(raw.description, ""),
+    isActive: typeof raw.is_active === "boolean" ? raw.is_active : true,
+    icon: asString(raw.icon, "grid"),
+    sortOrder: asNumber(raw.sort_order, index + 1),
+  };
+}
 
 export function Categories() {
-  const { serviceCategories } = useData();
+  const [data, setData] = useState<CategoriesResponse | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [selectedCategory, setSelectedCategory] = useState<any>(null);
+  const [selectedCategory, setSelectedCategory] = useState<CategoryRow | null>(null);
   const [formData, setFormData] = useState({
     name: "",
     icon: "",
@@ -66,19 +109,63 @@ export function Categories() {
     sortOrder: "",
   });
 
-  // Filter categories
-  const filteredCategories = serviceCategories.filter((category) => {
-    const matchesSearch = category.name.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = statusFilter === "all" || category.name; // All are active in current data
-    return matchesSearch && matchesStatus;
-  });
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      try {
+        setIsLoading(true);
+        setError(null);
+        const result = await fetchAdminJson<CategoriesResponse>(
+          `/api/admin/v1/marketplace/categories?page=1&limit=${LIMIT}`
+        );
+        if (!cancelled) setData(result);
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : "Failed to load categories.");
+        }
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    }
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
-  // Calculate stats
-  const stats = {
-    total: serviceCategories.length,
-    active: serviceCategories.length,
-    inactive: 0,
-    withSubcategories: 0,
+  const categories = useMemo(
+    () => (data?.categories ?? []).map((raw, index) => mapCategory(raw, index)),
+    [data]
+  );
+
+  const filteredCategories = useMemo(() => {
+    const needle = searchTerm.toLowerCase();
+    return categories.filter((category) => {
+      const matchesSearch = category.name.toLowerCase().includes(needle);
+      const matchesStatus =
+        statusFilter === "all" ||
+        (statusFilter === "active" && category.isActive) ||
+        (statusFilter === "inactive" && !category.isActive);
+      return matchesSearch && matchesStatus;
+    });
+  }, [categories, searchTerm, statusFilter]);
+
+  const stats = useMemo(() => {
+    const active = categories.filter((c) => c.isActive).length;
+    const inactive = categories.length - active;
+    return {
+      total: categories.length,
+      active,
+      inactive,
+      withSubcategories: 0,
+    };
+  }, [categories]);
+
+  const refresh = async () => {
+    const result = await fetchAdminJson<CategoriesResponse>(
+      `/api/admin/v1/marketplace/categories?page=1&limit=${LIMIT}`
+    );
+    setData(result);
   };
 
   const handleAdd = () => {
@@ -87,52 +174,114 @@ export function Categories() {
     setIsDialogOpen(true);
   };
 
-  const handleEdit = (category: any) => {
+  const handleEdit = (category: CategoryRow) => {
     setSelectedCategory(category);
     setFormData({
       name: category.name,
-      icon: category.id,
-      description: "",
-      status: "Active",
-      sortOrder: "",
+      icon: category.icon,
+      description: category.description,
+      status: category.isActive ? "Active" : "Inactive",
+      sortOrder: String(category.sortOrder),
     });
     setIsDialogOpen(true);
   };
 
-  const handleSave = () => {
-    console.log("Saving category:", formData);
-    alert(`✅ Category ${selectedCategory ? "updated" : "created"} successfully!`);
-    setIsDialogOpen(false);
+  const handleSave = async () => {
+    if (!formData.name.trim()) {
+      toast.error("Category name is required.");
+      return;
+    }
+    try {
+      setIsSubmitting(true);
+      const payload = {
+        name: formData.name.trim(),
+        icon: formData.icon.trim() || null,
+        description: formData.description.trim() || null,
+        is_active: formData.status === "Active",
+        sort_order: formData.sortOrder ? Number(formData.sortOrder) : null,
+      };
+
+      if (selectedCategory) {
+        await fetchAdminJson<{ status: string }>(`/api/admin/v1/marketplace/categories/${selectedCategory.id}`, {
+          method: "PATCH",
+          body: JSON.stringify(payload),
+        });
+        toast.success("Category updated.");
+      } else {
+        await fetchAdminJson<{ category: unknown }>(`/api/admin/v1/marketplace/categories`, {
+          method: "POST",
+          body: JSON.stringify(payload),
+        });
+        toast.success("Category created.");
+      }
+      setIsDialogOpen(false);
+      setSelectedCategory(null);
+      await refresh();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to save category.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  const handleDelete = (category: any) => {
+  const handleDelete = (category: CategoryRow) => {
     setSelectedCategory(category);
     setDeleteDialogOpen(true);
   };
 
-  const confirmDelete = () => {
-    console.log("Deleting category:", selectedCategory);
-    alert(`✅ Category "${selectedCategory?.name}" deleted successfully!`);
-    setDeleteDialogOpen(false);
-    setSelectedCategory(null);
+  const confirmDelete = async () => {
+    if (!selectedCategory) return;
+    try {
+      setIsSubmitting(true);
+      await fetchAdminJson<{ status: string }>(`/api/admin/v1/marketplace/categories/${selectedCategory.id}`, {
+        method: "DELETE",
+      });
+      toast.success(`Category "${selectedCategory.name}" deleted.`);
+      setDeleteDialogOpen(false);
+      setSelectedCategory(null);
+      await refresh();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to delete category.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  const toggleStatus = (category: any) => {
-    console.log("Toggling status for:", category.name);
-    alert(`✅ Category "${category.name}" status toggled!`);
+  const toggleStatus = async (category: CategoryRow) => {
+    try {
+      setIsSubmitting(true);
+      await fetchAdminJson<{ status: string }>(`/api/admin/v1/marketplace/categories/${category.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ is_active: !category.isActive }),
+      });
+      toast.success(`Category "${category.name}" status updated.`);
+      await refresh();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to update category status.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div>
         <h1 className="text-3xl font-bold text-gray-900">Categories</h1>
-        <p className="text-gray-500 mt-1">
-          Manage service categories and organize marketplace offerings
-        </p>
+        <p className="text-gray-500 mt-1">Manage service categories and organize marketplace offerings</p>
       </div>
 
-      {/* Stats Cards */}
+      {error ? (
+        <Card className="border-red-200 bg-red-50">
+          <CardContent className="flex items-start gap-3 p-6 text-red-700">
+            <AlertCircle className="mt-0.5 h-5 w-5 flex-shrink-0" />
+            <div>
+              <p className="font-semibold">Failed to load categories</p>
+              <p className="mt-1 text-sm">{error}</p>
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
+
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <Card>
           <CardContent className="p-6">
@@ -191,7 +340,6 @@ export function Categories() {
         </Card>
       </div>
 
-      {/* Main Categories Table */}
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
@@ -203,7 +351,6 @@ export function Categories() {
           </div>
         </CardHeader>
         <CardContent>
-          {/* Search & Filters */}
           <div className="mb-6 grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
@@ -226,90 +373,96 @@ export function Categories() {
             </Select>
           </div>
 
-          {/* Table */}
           <div className="border rounded-lg overflow-hidden">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-12"></TableHead>
                   <TableHead>Category Name</TableHead>
                   <TableHead>Icon/Badge</TableHead>
-                  <TableHead className="text-right">Number of Services</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Sort Order</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredCategories.map((category, index) => (
-                  <TableRow key={category.id}>
-                    <TableCell>
-                      <GripVertical className="w-5 h-5 text-gray-400 cursor-move" />
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-                          <Grid3x3 className="w-5 h-5 text-[#00BF63]" />
-                        </div>
-                        <div>
-                          <p className="font-medium text-gray-900">{category.name}</p>
-                          <p className="text-xs text-gray-500">{category.id}</p>
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-                        <Grid3x3 className="w-3 h-3 mr-1" />
-                        Icon
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right text-gray-600">-</TableCell>
-                    <TableCell>
-                      <Badge className="bg-[#DCFCE7] text-[#15803D] border-[#BBF7D0]">
-                        <CheckCircle className="w-3 h-3 mr-1" />
-                        Active
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right text-gray-600">{index + 1}</TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <Button variant="outline" size="sm" onClick={() => handleEdit(category)}>
-                          <Edit className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => toggleStatus(category)}
-                        >
-                          <Eye className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                          onClick={() => handleDelete(category)}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </div>
+                {isLoading ? (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center py-8 text-gray-500">
+                      Loading categories...
                     </TableCell>
                   </TableRow>
-                ))}
+                ) : filteredCategories.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center py-8 text-gray-500">
+                      No categories found
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredCategories.map((category) => (
+                    <TableRow key={category.id}>
+                      <TableCell>
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
+                            <Grid3x3 className="w-5 h-5 text-[#00BF63]" />
+                          </div>
+                          <div>
+                            <p className="font-medium text-gray-900">{category.name}</p>
+                            <p className="text-xs text-gray-500">{category.id}</p>
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                          {category.icon || "Icon"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        {category.isActive ? (
+                          <Badge className="bg-[#DCFCE7] text-[#15803D] border-[#BBF7D0]">
+                            <CheckCircle className="w-3 h-3 mr-1" />
+                            Active
+                          </Badge>
+                        ) : (
+                          <Badge className="bg-gray-100 text-gray-700 border-gray-200">
+                            <XCircle className="w-3 h-3 mr-1" />
+                            Inactive
+                          </Badge>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right text-gray-600">{category.sortOrder}</TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <Button variant="outline" size="sm" onClick={() => handleEdit(category)} disabled={isSubmitting}>
+                            <Edit className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => void toggleStatus(category)}
+                            disabled={isSubmitting}
+                          >
+                            {category.isActive ? "Disable" : "Enable"}
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                            onClick={() => handleDelete(category)}
+                            disabled={isSubmitting}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
               </TableBody>
             </Table>
           </div>
-
-          {filteredCategories.length === 0 && (
-            <div className="text-center py-12">
-              <Grid3x3 className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-              <p className="text-gray-500">No categories found</p>
-              <p className="text-sm text-gray-400 mt-1">Try adjusting your search or filters</p>
-            </div>
-          )}
         </CardContent>
       </Card>
 
-      {/* Add/Edit Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
@@ -325,7 +478,6 @@ export function Categories() {
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               />
             </div>
-
             <div className="space-y-2">
               <Label htmlFor="icon">Icon/Badge</Label>
               <Input
@@ -335,7 +487,6 @@ export function Categories() {
                 onChange={(e) => setFormData({ ...formData, icon: e.target.value })}
               />
             </div>
-
             <div className="space-y-2">
               <Label htmlFor="description">Description (Optional)</Label>
               <Textarea
@@ -346,7 +497,6 @@ export function Categories() {
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
               />
             </div>
-
             <div className="space-y-2">
               <Label htmlFor="status">Status</Label>
               <Select value={formData.status} onValueChange={(value) => setFormData({ ...formData, status: value })}>
@@ -359,7 +509,6 @@ export function Categories() {
                 </SelectContent>
               </Select>
             </div>
-
             <div className="space-y-2">
               <Label htmlFor="sortOrder">Sort Order</Label>
               <Input
@@ -372,32 +521,28 @@ export function Categories() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
+            <Button variant="outline" onClick={() => setIsDialogOpen(false)} disabled={isSubmitting}>
               Cancel
             </Button>
-            <Button className="bg-[#00BF63] hover:bg-[#00A055]" onClick={handleSave}>
+            <Button className="bg-[#00BF63] hover:bg-[#00A055]" onClick={() => void handleSave()} disabled={isSubmitting}>
               {selectedCategory ? "Update Category" : "Create Category"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation Dialog */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Category</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete "{selectedCategory?.name}"? This action cannot be undone
-              and will affect all associated services.
+              Are you sure you want to delete "{selectedCategory?.name}"? This action cannot be undone and may affect
+              associated services.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={confirmDelete}
-              className="bg-red-600 hover:bg-red-700"
-            >
+            <AlertDialogCancel disabled={isSubmitting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => void confirmDelete()} className="bg-red-600 hover:bg-red-700" disabled={isSubmitting}>
               Delete Category
             </AlertDialogAction>
           </AlertDialogFooter>

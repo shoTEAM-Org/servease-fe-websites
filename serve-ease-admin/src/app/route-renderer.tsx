@@ -45,6 +45,7 @@ import { Services } from "./pages/Services";
 import { Settings } from "./pages/Settings";
 import { Transactions } from "./pages/Transactions";
 import { Customers } from "./pages/Customers";
+import { CustomerDetails } from "./pages/CustomerDetails";
 import { Broadcasts, Support } from "./pages/PlaceholderPages";
 import { Login } from "./pages/Login";
 import { Navigate, RouteContextProvider } from "@/lib/react-router-compat";
@@ -72,6 +73,7 @@ const ROUTES: RouteEntry[] = [
   { path: "/settings", component: Settings, protected: true, layout: true },
   { path: "/security", component: Security, protected: true, layout: true },
   { path: "/customers", component: Customers, protected: true, layout: true },
+  { path: "/customers/:id", component: CustomerDetails, protected: true, layout: true },
   { path: "/service-providers", component: ServiceProviders, protected: true, layout: true },
   { path: "/service-providers/:id", component: ServiceProviderDetails, protected: true, layout: true },
   { path: "/provider-applications", component: ProviderApplications, protected: true, layout: true },

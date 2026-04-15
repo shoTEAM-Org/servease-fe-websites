@@ -3,6 +3,27 @@
 
 ServEase admin portal aligned to the shared FE multi-app template.
 
+## Admin integration status
+
+The following pages are now backend-driven (no mock-only data):
+
+- User Management
+  - Customers list + customer details + status updates
+  - Service Providers list + provider details + status updates
+  - Approval Queue list + application review + approve/reject
+- Operations
+  - All Bookings list (filters, stats, pagination)
+  - Ongoing Services list + status updates + dispute/escalation actions
+
+## Data source policy
+
+- The admin frontend uses `fetchAdminJson` (`src/app/lib/adminApi.ts`) to call backend admin APIs.
+- Admin pages should **not** call Supabase directly from the frontend.
+
+## Backend runtime note
+
+If you recently pulled API changes and pages show timeout/empty states, restart backend services so new routes/patterns are active (gateway + admin-service, with Kafka available).
+
 ## Stack
 
 - Next.js app router

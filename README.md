@@ -52,3 +52,7 @@ Run per app:
 cd serve-ease && npm install && npm run lint && npm run test && npm run build
 cd serve-ease-admin && npm install && npm run lint && npm run test && npm run build
 ```
+
+## Admin app integration notes
+
+The `serve-ease-admin` app has active backend integrations for User Management and Operations flows (customers, providers, approval queue, all bookings, ongoing services). The frontend uses backend admin APIs and should not connect directly to Supabase.

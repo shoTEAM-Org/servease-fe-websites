@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "@/lib/react-router-compat";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Badge } from "../components/ui/badge";
@@ -12,15 +12,7 @@ import {
   TableHeader,
   TableRow,
 } from "../components/ui/table";
-import {
-  Search,
-  Filter,
-  Eye,
-  Clock,
-  CheckCircle,
-  XCircle,
-  AlertCircle,
-} from "lucide-react";
+import { Search, Filter, Eye, Clock, CheckCircle, XCircle, AlertCircle } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -28,216 +20,189 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../components/ui/select";
+import { fetchAdminJson } from "../lib/adminApi";
 
-// Export applications data for use in detail page
-export const applications = [
-  {
-    applicationId: "APP-2026-0234",
-    businessName: "Tutor Excellence Hub",
-    ownerName: "Roberto Miguel Cruz",
-    category: "Education & Professional Services",
-    dateApplied: "2026-03-01",
-    location: "Taguig City, Metro Manila",
-    status: "pending",
-    providerId: "SE-ED-003",
-  },
-  {
-    applicationId: "APP-2026-0235",
-    businessName: "Wellness Massage Therapy",
-    ownerName: "Carmen Grace Alvarez",
-    category: "Beauty Wellness & Personal Care",
-    dateApplied: "2026-03-03",
-    location: "Manila City, Metro Manila",
-    status: "pending",
-    providerId: "SE-BW-009",
-  },
-  {
-    applicationId: "APP-2026-0236",
-    businessName: "Prime Cleaning Solutions",
-    ownerName: "Fernando Jose Santos",
-    category: "Domestic & Cleaning Services",
-    dateApplied: "2026-03-02",
-    location: "Quezon City, Metro Manila",
-    status: "pending",
-    providerId: "SE-DC-016",
-  },
-  {
-    applicationId: "APP-2026-0237",
-    businessName: "AutoCare Express",
-    ownerName: "Leonardo David Reyes",
-    category: "Automotive & Tech Support",
-    dateApplied: "2026-03-04",
-    location: "Makati City, Metro Manila",
-    status: "pending",
-    providerId: "SE-AT-017",
-  },
-  {
-    applicationId: "APP-2026-0238",
-    businessName: "PetCare Veterinary Services",
-    ownerName: "Victoria Anne Lopez",
-    category: "Pet Services",
-    dateApplied: "2026-03-03",
-    location: "Pasig City, Metro Manila",
-    status: "pending",
-    providerId: "SE-PS-018",
-  },
-  {
-    applicationId: "APP-2026-0239",
-    businessName: "EventMasters Pro",
-    ownerName: "Christopher James Diaz",
-    category: "Events & Entertainment",
-    dateApplied: "2026-03-01",
-    location: "Pasay City, Metro Manila",
-    status: "pending",
-    providerId: "SE-EE-019",
-  },
-  {
-    applicationId: "APP-2026-0240",
-    businessName: "HandyFix Home Services",
-    ownerName: "Michelle Anne Garcia",
-    category: "Home Maintenance & Repair",
-    dateApplied: "2026-03-02",
-    location: "Mandaluyong City, Metro Manila",
-    status: "pending",
-    providerId: "SE-HM-020",
-  },
-  {
-    applicationId: "APP-2026-0228",
-    businessName: "ElectroPro Electricians",
-    ownerName: "Antonio Carlos Rivera",
-    category: "Home Maintenance & Repair",
-    dateApplied: "2024-01-20",
-    location: "Malabon City, Metro Manila",
-    status: "approved",
-    providerId: "SE-HM-015",
-  },
-  {
-    applicationId: "APP-2026-0215",
-    businessName: "HomeFixPro Manila",
-    ownerName: "Juan Carlos Reyes",
-    category: "Home Maintenance & Repair",
-    dateApplied: "2024-01-10",
-    location: "Makati City, Metro Manila",
-    status: "approved",
-    providerId: "SE-HM-001",
-  },
-  {
-    applicationId: "APP-2026-0221",
-    businessName: "Glow Beauty Spa",
-    ownerName: "Maria Elena Santos",
-    category: "Beauty Wellness & Personal Care",
-    dateApplied: "2024-02-15",
-    location: "Quezon City, Metro Manila",
-    status: "approved",
-    providerId: "SE-BW-002",
-  },
-  {
-    applicationId: "APP-2026-0198",
-    businessName: "QuickTech Repairs",
-    ownerName: "Santiago Miguel Torres",
-    category: "Automotive & Tech Support",
-    dateApplied: "2023-12-05",
-    location: "Valenzuela City, Metro Manila",
-    status: "rejected",
-    providerId: "SE-AT-021",
-  },
-  {
-    applicationId: "APP-2026-0205",
-    businessName: "CleanSwift Services",
-    ownerName: "Angelica Rose Mendoza",
-    category: "Domestic & Cleaning Services",
-    dateApplied: "2024-01-08",
-    location: "Paranaque City, Metro Manila",
-    status: "rejected",
-    providerId: "SE-DC-022",
-  },
-];
+type ApplicationStatus = "pending" | "approved" | "rejected";
 
-const stats = [
-  {
-    title: "Pending Review",
-    value: "7",
-    subtitle: "Awaiting approval",
-    icon: Clock,
-    color: "text-amber-600",
-    bgColor: "bg-amber-50",
-  },
-  {
-    title: "Approved Today",
-    value: "3",
-    subtitle: "Applications processed",
-    icon: CheckCircle,
-    color: "text-green-600",
-    bgColor: "bg-green-50",
-  },
-  {
-    title: "Requires Action",
-    value: "2",
-    subtitle: "Urgent reviews needed",
-    icon: AlertCircle,
-    color: "text-red-600",
-    bgColor: "bg-red-50",
-  },
-];
+type ProviderApplication = {
+  applicationId: string;
+  providerId: string;
+  businessName: string;
+  ownerName: string;
+  category: string;
+  dateApplied: string;
+  location: string;
+  status: ApplicationStatus;
+  email: string | null;
+  contact_number: string | null;
+};
+
+type ProviderApplicationsResponse = {
+  applications: ProviderApplication[];
+  total: number;
+  page: number;
+  limit: number;
+};
+
+const LIMIT = 20;
+
+function asString(value: unknown, fallback = ""): string {
+  return typeof value === "string" ? value : fallback;
+}
+
+function asNumber(value: unknown, fallback = 0): number {
+  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+}
+
+function asStatus(value: unknown): ApplicationStatus {
+  const status = asString(value).toLowerCase();
+  if (status === "approved" || status === "rejected") return status;
+  return "pending";
+}
+
+function normalizeApplication(raw: Partial<ProviderApplication>): ProviderApplication {
+  return {
+    applicationId: asString(raw.applicationId),
+    providerId: asString(raw.providerId),
+    businessName: asString(raw.businessName, "Unnamed Business"),
+    ownerName: asString(raw.ownerName, "Unknown Owner"),
+    category: asString(raw.category, "General Services"),
+    dateApplied: asString(raw.dateApplied),
+    location: asString(raw.location, "—"),
+    status: asStatus(raw.status),
+    email: typeof raw.email === "string" ? raw.email : null,
+    contact_number: typeof raw.contact_number === "string" ? raw.contact_number : null,
+  };
+}
 
 export function ProviderApplications() {
   const navigate = useNavigate();
+  const [data, setData] = useState<ProviderApplicationsResponse | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("pending");
   const [categoryFilter, setCategoryFilter] = useState("all");
+  const [page, setPage] = useState(1);
 
-  let filteredApplications = applications.filter((app) => {
-    const matchesSearch =
-      app.businessName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      app.ownerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      app.applicationId.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = statusFilter === "all" || app.status === statusFilter;
-    const matchesCategory = categoryFilter === "all" || app.category === categoryFilter;
-    return matchesSearch && matchesStatus && matchesCategory;
-  });
+  useEffect(() => {
+    let cancelled = false;
 
-  // Sort: pending first, then by date (newest first)
-  filteredApplications = [...filteredApplications].sort((a, b) => {
-    if (a.status === "pending" && b.status !== "pending") return -1;
-    if (a.status !== "pending" && b.status === "pending") return 1;
-    return new Date(b.dateApplied).getTime() - new Date(a.dateApplied).getTime();
-  });
+    async function load() {
+      try {
+        setIsLoading(true);
+        setError(null);
+        const result = await fetchAdminJson<ProviderApplicationsResponse>(
+          `/api/admin/v1/users/provider-applications?page=${page}&limit=${LIMIT}&status=${statusFilter}`
+        );
 
-  const getStatusBadge = (status: string) => {
+        if (!cancelled) {
+          const applications = Array.isArray((result as { applications?: unknown[] }).applications)
+            ? (result as { applications: unknown[] }).applications.map((raw) =>
+                normalizeApplication((raw ?? {}) as Partial<ProviderApplication>)
+              )
+            : [];
+          setData({
+            applications,
+            total: asNumber((result as { total?: unknown }).total, applications.length),
+            page: asNumber((result as { page?: unknown }).page, page),
+            limit: asNumber((result as { limit?: unknown }).limit, LIMIT),
+          });
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : "Failed to load provider applications.");
+        }
+      } finally {
+        if (!cancelled) {
+          setIsLoading(false);
+        }
+      }
+    }
+
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, [page, statusFilter]);
+
+  const applications = data?.applications ?? [];
+  const total = data?.total ?? 0;
+  const totalPages = Math.max(1, Math.ceil(total / LIMIT));
+  const pendingCount = applications.filter((app) => app.status === "pending").length;
+  const approvedCount = applications.filter((app) => app.status === "approved").length;
+  const rejectedCount = applications.filter((app) => app.status === "rejected").length;
+
+  const filteredApplications = useMemo(() => {
+    const needle = searchTerm.toLowerCase();
+    return applications.filter((app) => {
+      const matchesSearch =
+        app.businessName.toLowerCase().includes(needle) ||
+        app.ownerName.toLowerCase().includes(needle) ||
+        app.applicationId.toLowerCase().includes(needle);
+      const matchesCategory = categoryFilter === "all" || app.category === categoryFilter;
+      return matchesSearch && matchesCategory;
+    });
+  }, [applications, searchTerm, categoryFilter]);
+
+  const categories = Array.from(new Set(applications.map((app) => app.category))).sort();
+
+  const stats = [
+    {
+      title: "Pending Review",
+      value: pendingCount.toString(),
+      subtitle: "Awaiting approval",
+      icon: Clock,
+      color: "text-amber-600",
+      bgColor: "bg-amber-50",
+    },
+    {
+      title: "Approved (page)",
+      value: approvedCount.toString(),
+      subtitle: "Processed applications",
+      icon: CheckCircle,
+      color: "text-green-600",
+      bgColor: "bg-green-50",
+    },
+    {
+      title: "Rejected (page)",
+      value: rejectedCount.toString(),
+      subtitle: "Requires re-submission",
+      icon: AlertCircle,
+      color: "text-red-600",
+      bgColor: "bg-red-50",
+    },
+  ];
+
+  const getStatusBadge = (status: ApplicationStatus) => {
     if (status === "pending") {
-      return (
-        <Badge className="bg-amber-100 text-amber-700 border-amber-200">
-          Pending Review
-        </Badge>
-      );
+      return <Badge className="bg-amber-100 text-amber-700 border-amber-200">Pending Review</Badge>;
     }
     if (status === "approved") {
-      return (
-        <Badge className="bg-green-100 text-green-700 border-green-200">
-          Approved
-        </Badge>
-      );
+      return <Badge className="bg-green-100 text-green-700 border-green-200">Approved</Badge>;
     }
-    if (status === "rejected") {
-      return (
-        <Badge className="bg-red-100 text-red-700 border-red-200">Rejected</Badge>
-      );
-    }
-    return <Badge variant="outline">{status}</Badge>;
+    return <Badge className="bg-red-100 text-red-700 border-red-200">Rejected</Badge>;
   };
-
-  const pendingCount = applications.filter((app) => app.status === "pending").length;
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold text-gray-900">Provider Applications</h1>
-        <p className="text-gray-500 mt-1">
-          Review and approve new service provider applications
-        </p>
+        <p className="text-gray-500 mt-1">Review and approve new service provider applications</p>
       </div>
 
-      {/* Stats */}
+      {error ? (
+        <Card className="border-red-200 bg-red-50">
+          <CardContent className="flex items-start gap-3 p-6 text-red-700">
+            <AlertCircle className="mt-0.5 h-5 w-5 flex-shrink-0" />
+            <div>
+              <p className="font-semibold">Failed to load approval queue</p>
+              <p className="mt-1 text-sm">{error}</p>
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
+
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {stats.map((stat) => (
           <Card key={stat.title}>
@@ -257,20 +222,18 @@ export function ProviderApplications() {
         ))}
       </div>
 
-      {/* Filters and Table */}
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle>Application Queue</CardTitle>
             <div className="flex items-center gap-2 text-sm text-gray-500">
               <Filter className="w-4 h-4" />
-              {filteredApplications.length} of {applications.length} applications
+              {filteredApplications.length} of {total} applications
             </div>
           </div>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-            {/* Search */}
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
               <Input
@@ -281,47 +244,35 @@ export function ProviderApplications() {
               />
             </div>
 
-            {/* Status Filter */}
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <Select
+              value={statusFilter}
+              onValueChange={(value) => {
+                setStatusFilter(value);
+                setPage(1);
+              }}
+            >
               <SelectTrigger>
                 <SelectValue placeholder="Filter by status" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="pending">
-                  Pending Review ({pendingCount})
-                </SelectItem>
+                <SelectItem value="pending">Pending Review</SelectItem>
                 <SelectItem value="approved">Approved</SelectItem>
                 <SelectItem value="rejected">Rejected</SelectItem>
               </SelectContent>
             </Select>
 
-            {/* Category Filter */}
             <Select value={categoryFilter} onValueChange={setCategoryFilter}>
               <SelectTrigger>
                 <SelectValue placeholder="Filter by category" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Categories</SelectItem>
-                <SelectItem value="Home Maintenance & Repair">
-                  Home Maintenance & Repair
-                </SelectItem>
-                <SelectItem value="Beauty Wellness & Personal Care">
-                  Beauty Wellness & Personal Care
-                </SelectItem>
-                <SelectItem value="Education & Professional Services">
-                  Education & Professional Services
-                </SelectItem>
-                <SelectItem value="Domestic & Cleaning Services">
-                  Domestic & Cleaning Services
-                </SelectItem>
-                <SelectItem value="Pet Services">Pet Services</SelectItem>
-                <SelectItem value="Events & Entertainment">
-                  Events & Entertainment
-                </SelectItem>
-                <SelectItem value="Automotive & Tech Support">
-                  Automotive & Tech Support
-                </SelectItem>
+                {categories.map((category) => (
+                  <SelectItem key={category} value={category}>
+                    {category}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -341,7 +292,13 @@ export function ProviderApplications() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredApplications.length === 0 ? (
+                {isLoading ? (
+                  <TableRow>
+                    <TableCell colSpan={8} className="text-center py-8 text-gray-500">
+                      Loading applications...
+                    </TableCell>
+                  </TableRow>
+                ) : filteredApplications.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={8} className="text-center py-8 text-gray-500">
                       No applications found matching your filters
@@ -351,14 +308,10 @@ export function ProviderApplications() {
                   filteredApplications.map((app) => (
                     <TableRow key={app.applicationId}>
                       <TableCell>
-                        <span className="font-mono font-semibold text-gray-900">
-                          {app.applicationId}
-                        </span>
+                        <span className="font-mono font-semibold text-gray-900">{app.applicationId}</span>
                       </TableCell>
                       <TableCell>
-                        <span className="font-semibold text-gray-900">
-                          {app.businessName}
-                        </span>
+                        <span className="font-semibold text-gray-900">{app.businessName}</span>
                       </TableCell>
                       <TableCell>
                         <span className="text-gray-700">{app.ownerName}</span>
@@ -368,11 +321,13 @@ export function ProviderApplications() {
                       </TableCell>
                       <TableCell>
                         <span className="text-sm text-gray-600">
-                          {new Date(app.dateApplied).toLocaleDateString("en-US", {
-                            year: "numeric",
-                            month: "short",
-                            day: "numeric",
-                          })}
+                          {app.dateApplied
+                            ? new Date(app.dateApplied).toLocaleDateString("en-US", {
+                                year: "numeric",
+                                month: "short",
+                                day: "numeric",
+                              })
+                            : "—"}
                         </span>
                       </TableCell>
                       <TableCell>
@@ -395,6 +350,32 @@ export function ProviderApplications() {
                 )}
               </TableBody>
             </Table>
+          </div>
+
+          <div className="flex items-center justify-between mt-6">
+            <p className="text-sm text-gray-500">
+              {total === 0
+                ? "No applications"
+                : `Page ${page} of ${totalPages} (${total.toLocaleString()} total)`}
+            </p>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={page <= 1 || isLoading}
+                onClick={() => setPage((p) => p - 1)}
+              >
+                Previous
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={page >= totalPages || isLoading}
+                onClick={() => setPage((p) => p + 1)}
+              >
+                Next
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>
