@@ -27,7 +27,7 @@ type Customer = {
   id: string;
   full_name: string;
   email: string;
-  contact_number: string;
+  contact_number: string | null;
   status: string;
   created_at: string;
   booking_count: number;
@@ -62,25 +62,38 @@ export function Customers() {
   const [page, setPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState("");
   const [togglingId, setTogglingId] = useState<string | null>(null);
-
-  async function load(targetPage: number) {
-    try {
-      setIsLoading(true);
-      setError(null);
-      const result = await fetchAdminJson<CustomersResponse>(
-        `/api/admin/v1/users/customers?page=${targetPage}&limit=${LIMIT}`
-      );
-      setData(result);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load customers.");
-    } finally {
-      setIsLoading(false);
-    }
-  }
+  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
-    void load(page);
-  }, [page]);
+    let cancelled = false;
+
+    async function load() {
+      try {
+        setIsLoading(true);
+        setError(null);
+        const result = await fetchAdminJson<CustomersResponse>(
+          `/api/admin/v1/users/customers?page=${page}&limit=${LIMIT}`
+        );
+        if (!cancelled) {
+          setData(result);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : "Failed to load customers.");
+        }
+      } finally {
+        if (!cancelled) {
+          setIsLoading(false);
+        }
+      }
+    }
+
+    void load();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [page, refreshKey]);
 
   async function toggleStatus(customer: Customer) {
     const newStatus = customer.status.toLowerCase() === "active" ? "suspended" : "active";
@@ -90,7 +103,8 @@ export function Customers() {
         method: "PATCH",
         body: JSON.stringify({ status: newStatus }),
       });
-      void load(page);
+      toast.success("Customer status updated.");
+      setRefreshKey((k) => k + 1);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to update status.");
     } finally {
@@ -101,7 +115,7 @@ export function Customers() {
   const customers = data?.customers ?? [];
   const total = data?.total ?? 0;
   const totalPages = Math.ceil(total / LIMIT);
-  const rangeStart = (page - 1) * LIMIT + 1;
+  const rangeStart = total === 0 ? 0 : (page - 1) * LIMIT + 1;
   const rangeEnd = Math.min(page * LIMIT, total);
 
   const filtered = customers.filter(
