@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import { AlertTriangle, Camera, Check as CheckIcon, ChevronDown, CloudUpload, Eye, EyeOff, FileText, X } from "lucide-react";
+import { requestJson } from "@/lib/providerApi";
 
 const categories = [
   "Home Maintenance & Repair",
@@ -51,10 +52,22 @@ function isAtLeast18(dob: string) {
   return age >= 18;
 }
 
+type ProviderSignupResponse = {
+  status?: string;
+  message?: string;
+  data?: {
+    provider_id?: string;
+    business_name?: string;
+    verification_status?: string;
+  };
+};
+
 export function SignupPage() {
   const navigate = useNavigate();
   const [step, setStep] = useState(1);
   const [timeLeft, setTimeLeft] = useState(295);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [showStepOneErrors, setShowStepOneErrors] = useState(false);
@@ -64,6 +77,7 @@ export function SignupPage() {
 
   const [formData, setFormData] = useState({
     fullName: "",
+    businessName: "",
     email: "",
     phone: "",
     dob: "",
@@ -79,6 +93,7 @@ export function SignupPage() {
     radius: 10,
     idType: "",
     idDocument: "" as string,
+    idDocumentFile: null as File | null,
     otp: ["", "", "", "", "", ""],
   });
 
@@ -96,6 +111,7 @@ export function SignupPage() {
 
   useEffect(() => {
     setOpenDropdown(null);
+    setSubmitError("");
   }, [step]);
 
   const passwordCriteria = useMemo(
@@ -124,12 +140,17 @@ export function SignupPage() {
         !hasAllowedEmailDomain(formData.email) ||
         !isAtLeast18(formData.dob) ||
         formData.password !== formData.confirmPassword)) ||
-    (step === 2 && (!formData.primaryCategory || !formData.subCategory || !formData.experienceLevel)) ||
+    (step === 2 &&
+      (!formData.businessName || !formData.primaryCategory || !formData.subCategory || !formData.experienceLevel)) ||
     (step === 3 && (!formData.streetAddress || !formData.city || !formData.province || !formData.zipCode)) ||
-    (step === 4 && (!formData.idType || !formData.idDocument)) ||
+    (step === 4 && (!formData.idType || !formData.idDocumentFile)) ||
     (step === 5 && formData.otp.some((digit) => !digit));
 
-  const next = () => {
+  const next = async () => {
+    if (isSubmitting) {
+      return;
+    }
+
     if (step === 1) {
       setShowStepOneErrors(true);
     }
@@ -143,7 +164,37 @@ export function SignupPage() {
       return;
     }
 
-    navigate("/registration-success");
+    if (!formData.idDocumentFile) {
+      setSubmitError("Please upload a valid ID document before continuing.");
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      setSubmitError("");
+
+      const payload = new FormData();
+      payload.append("full_name", formData.fullName.trim());
+      payload.append("email", formData.email.trim().toLowerCase());
+      payload.append("contact_number", formData.phone.trim());
+      payload.append("password", formData.password);
+      payload.append("role", "provider");
+      payload.append("business_name", formData.businessName.trim());
+      payload.append("document_type", "government_id");
+      payload.append("date_of_birth", formData.dob);
+      payload.append("document_file", formData.idDocumentFile);
+
+      await requestJson<ProviderSignupResponse>("/api/auth/v2/register", {
+        method: "POST",
+        body: payload,
+      });
+
+      navigate("/registration-success");
+    } catch (error) {
+      setSubmitError(error instanceof Error ? error.message : "Failed to submit your provider application.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const setOtpValue = (index: number, value: string) => {
@@ -419,6 +470,14 @@ export function SignupPage() {
               <h2 style={styles.title}>Your Service Profile</h2>
               <p style={styles.subtitle}>Tell us what type of service you offer and your experience level.</p>
 
+              <Label text="Business Name *" />
+              <input
+                style={styles.input}
+                placeholder="Enter your business name"
+                value={formData.businessName}
+                onChange={(e) => setFormData({ ...formData, businessName: e.target.value })}
+              />
+
               <Label text="Primary Category *" />
               <div style={styles.dropdownWrap}>
                 <button
@@ -672,8 +731,20 @@ export function SignupPage() {
                 accept=".png,.jpg,.jpeg,.pdf"
                 style={{ display: "none" }}
                 onChange={(e) => {
-                  const fileName = e.target.files?.[0]?.name ?? "";
-                  setFormData((prev) => ({ ...prev, idDocument: fileName }));
+                  const selectedFile = e.target.files?.[0] ?? null;
+                  if (selectedFile && selectedFile.size > 5 * 1024 * 1024) {
+                    setSubmitError("ID document must be 5MB or smaller.");
+                    e.currentTarget.value = "";
+                    setFormData((prev) => ({ ...prev, idDocument: "", idDocumentFile: null }));
+                    return;
+                  }
+
+                  setSubmitError("");
+                  setFormData((prev) => ({
+                    ...prev,
+                    idDocument: selectedFile?.name ?? "",
+                    idDocumentFile: selectedFile,
+                  }));
                 }}
               />
 
@@ -689,7 +760,13 @@ export function SignupPage() {
                   <button
                     type="button"
                     style={styles.removeDocButton}
-                    onClick={() => setFormData((prev) => ({ ...prev, idDocument: "" }))}
+                    onClick={() => {
+                      if (fileInputRef.current) {
+                        fileInputRef.current.value = "";
+                      }
+                      setSubmitError("");
+                      setFormData((prev) => ({ ...prev, idDocument: "", idDocumentFile: null }));
+                    }}
                     aria-label="Remove selected document"
                   >
                     <X size={18} />
@@ -715,7 +792,7 @@ export function SignupPage() {
                     <button
                       type="button"
                       style={styles.uploadScanButton}
-                      onClick={() => setFormData((prev) => ({ ...prev, idDocument: "scanned_id.jpg" }))}
+                      onClick={() => fileInputRef.current?.click()}
                     >
                       <Camera size={16} />
                       <span>Scan</span>
@@ -770,8 +847,16 @@ export function SignupPage() {
 
       <div style={styles.footer}>
         <div style={styles.shell}>
-          <button type="button" style={{ ...styles.nextButton, ...(isStepInvalid ? styles.nextButtonDisabled : {}) }} onClick={next}>
-            {step === 5 ? "Complete Registration" : "Next Step"}
+          {submitError ? <p style={styles.submitErrorText}>{submitError}</p> : null}
+          <button
+            type="button"
+            style={{ ...styles.nextButton, ...(isStepInvalid || isSubmitting ? styles.nextButtonDisabled : {}) }}
+            onClick={() => {
+              void next();
+            }}
+            disabled={isStepInvalid || isSubmitting}
+          >
+            {isSubmitting ? "Submitting..." : step === 5 ? "Complete Registration" : "Next Step"}
           </button>
         </div>
       </div>
@@ -1317,5 +1402,11 @@ const styles: Record<string, React.CSSProperties> = {
   nextButtonDisabled: {
     background: "#9adfb9",
     cursor: "not-allowed",
+  },
+  submitErrorText: {
+    color: "#DC2626",
+    fontSize: "13px",
+    margin: "0 0 10px",
+    textAlign: "center",
   },
 };

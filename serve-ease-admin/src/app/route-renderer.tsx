@@ -46,7 +46,8 @@ import { Settings } from "./pages/Settings";
 import { Transactions } from "./pages/Transactions";
 import { Customers } from "./pages/Customers";
 import { CustomerDetails } from "./pages/CustomerDetails";
-import { Broadcasts, Support } from "./pages/PlaceholderPages";
+import { Broadcasts } from "./pages/Broadcasts";
+import { Support } from "./pages/Support";
 import { Login } from "./pages/Login";
 import { Navigate, RouteContextProvider } from "@/lib/react-router-compat";
 

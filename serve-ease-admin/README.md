@@ -40,6 +40,18 @@ npm run lint
 npm run build
 ```
 
+## Environment setup
+
+Create a local env file from the template:
+
+```bash
+copy .env.example .env
+```
+
+Required variable:
+
+- `NEXT_PUBLIC_API_BASE_URL` (example: `http://localhost:5000`)
+
 ## Notes
 
 - Routing is handled through the Next app router entrypoints in `src/app`.

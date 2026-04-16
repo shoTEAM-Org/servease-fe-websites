@@ -56,3 +56,7 @@ cd serve-ease-admin && npm install && npm run lint && npm run test && npm run bu
 ## Admin app integration notes
 
 The `serve-ease-admin` app has active backend integrations for User Management and Operations flows (customers, providers, approval queue, all bookings, ongoing services). The frontend uses backend admin APIs and should not connect directly to Supabase.
+
+## Provider app integration notes
+
+The `serve-ease` provider app now submits provider registration via backend auth (`/api/auth/v2/register`) and uses backend login (`/api/auth/v1/login`). Provider applications enter `pending` status and require admin approval from the admin approval queue before login is allowed.

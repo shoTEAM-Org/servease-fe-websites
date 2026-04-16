@@ -2,7 +2,18 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router';
 import { Mail, Lock, Eye, EyeOff, ArrowRight, Calendar, DollarSign, Star } from 'lucide-react';
 import logo from '@/assets/d5c1631be6e8531539bd8040a765725f4a4ddc2c.png';
-import { setUserAuthenticated } from '../auth';
+import { persistProviderSession } from '../auth';
+import { requestJson } from '@/lib/providerApi';
+
+type LoginResponse = {
+  access_token?: string;
+  refresh_token?: string;
+  user?: {
+    id?: string;
+    email?: string;
+    role?: string;
+  };
+};
 
 export function LoginPage() {
   const navigate = useNavigate();
@@ -18,17 +29,52 @@ export function LoginPage() {
     setError('');
     setIsLoading(true);
 
-    // Simulate API call
-    setTimeout(() => {
-      if (email && password) {
-        setUserAuthenticated(true);
-        // Success - navigate to dashboard
-        navigate('/provider/dashboard');
-      } else {
-        setError('Please enter both email and password');
-        setIsLoading(false);
+    const identifier = email.trim();
+    if (!identifier || !password) {
+      setError('Please enter both email and password');
+      setIsLoading(false);
+      return;
+    }
+
+    try {
+      const loginIdentifier = identifier.includes('@') ? identifier.toLowerCase() : identifier;
+      const result = await requestJson<LoginResponse>('/api/auth/v1/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: loginIdentifier,
+          password,
+        }),
+      });
+
+      const accessToken = String(result.access_token || '').trim();
+      if (!accessToken) {
+        throw new Error('Login response is missing an access token.');
       }
-    }, 1500);
+
+      const role = String(result.user?.role || '').toLowerCase();
+      if (role && role !== 'provider') {
+        throw new Error('This portal is only available for provider accounts.');
+      }
+
+      persistProviderSession({
+        accessToken,
+        refreshToken: result.refresh_token,
+        user: {
+          id: result.user?.id,
+          email: result.user?.email,
+          role: result.user?.role,
+        },
+      });
+
+      navigate('/provider/dashboard');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to log in right now. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   // Styles
