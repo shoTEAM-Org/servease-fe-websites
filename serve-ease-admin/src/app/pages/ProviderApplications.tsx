@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "@/lib/react-router-compat";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Badge } from "../components/ui/badge";
@@ -28,6 +28,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../components/ui/select";
+import {
+  getProviderApplications,
+  subscribeProviderApplications,
+} from "../../services/providerApplicationsStore";
 
 // Export applications data for use in detail page
 export const applications = [
@@ -153,40 +157,53 @@ export const applications = [
   },
 ];
 
-const stats = [
-  {
-    title: "Pending Review",
-    value: "7",
-    subtitle: "Awaiting approval",
-    icon: Clock,
-    color: "text-amber-600",
-    bgColor: "bg-amber-50",
-  },
-  {
-    title: "Approved Today",
-    value: "3",
-    subtitle: "Applications processed",
-    icon: CheckCircle,
-    color: "text-green-600",
-    bgColor: "bg-green-50",
-  },
-  {
-    title: "Requires Action",
-    value: "2",
-    subtitle: "Urgent reviews needed",
-    icon: AlertCircle,
-    color: "text-red-600",
-    bgColor: "bg-red-50",
-  },
-];
-
 export function ProviderApplications() {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("pending");
   const [categoryFilter, setCategoryFilter] = useState("all");
+  const [applicationsData, setApplicationsData] = useState(() => getProviderApplications());
 
-  let filteredApplications = applications.filter((app) => {
+  useEffect(
+    () =>
+      subscribeProviderApplications(() => {
+        setApplicationsData(getProviderApplications());
+      }),
+    [],
+  );
+
+  const pendingCount = applicationsData.filter((app) => app.status === "pending").length;
+  const approvedCount = applicationsData.filter((app) => app.status === "approved").length;
+  const rejectedCount = applicationsData.filter((app) => app.status === "rejected").length;
+
+  const stats = [
+    {
+      title: "Pending Review",
+      value: String(pendingCount),
+      subtitle: "Awaiting approval",
+      icon: Clock,
+      color: "text-amber-600",
+      bgColor: "bg-amber-50",
+    },
+    {
+      title: "Approved",
+      value: String(approvedCount),
+      subtitle: "Applications processed",
+      icon: CheckCircle,
+      color: "text-green-600",
+      bgColor: "bg-green-50",
+    },
+    {
+      title: "Requires Action",
+      value: String(rejectedCount),
+      subtitle: "Rejected applications",
+      icon: AlertCircle,
+      color: "text-red-600",
+      bgColor: "bg-red-50",
+    },
+  ];
+
+  let filteredApplications = applicationsData.filter((app) => {
     const matchesSearch =
       app.businessName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       app.ownerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -226,8 +243,6 @@ export function ProviderApplications() {
     return <Badge variant="outline">{status}</Badge>;
   };
 
-  const pendingCount = applications.filter((app) => app.status === "pending").length;
-
   return (
     <div className="space-y-6">
       <div>
@@ -264,7 +279,7 @@ export function ProviderApplications() {
             <CardTitle>Application Queue</CardTitle>
             <div className="flex items-center gap-2 text-sm text-gray-500">
               <Filter className="w-4 h-4" />
-              {filteredApplications.length} of {applications.length} applications
+              {filteredApplications.length} of {applicationsData.length} applications
             </div>
           </div>
         </CardHeader>

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate, useParams } from "@/lib/react-router-compat";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
@@ -56,6 +56,13 @@ import {
   Calendar,
   Lock,
 } from "lucide-react";
+import {
+  getProviderApplicationById,
+  getProviderApplicationStatus,
+  subscribeProviderApplications,
+  updateProviderApplicationStatus,
+  type ProviderApplicationSummary,
+} from "../../services/providerApplicationsStore";
 
 /* ─── MOCK DATA ─────────────────────────────────────────────────── */
 const buildApplication = (
@@ -252,11 +259,64 @@ function ReadOnlyField({ label, children }: { label: string; children: React.Rea
   );
 }
 
+function SummaryOnlyReview({
+  summary,
+  onBack,
+}: {
+  summary: ProviderApplicationSummary;
+  onBack: () => void;
+}) {
+  return (
+    <div className="space-y-5 pb-24">
+      <Button variant="outline" onClick={onBack} className="gap-2 w-fit">
+        <ArrowLeft className="w-4 h-4" />Back to Approval Queue
+      </Button>
+
+      <Card className="border-amber-200 bg-amber-50/60">
+        <CardHeader className="space-y-2">
+          <CardTitle className="flex items-center gap-2 text-amber-900">
+            <AlertTriangle className="w-5 h-5" />Full review payload unavailable
+          </CardTitle>
+          <p className="text-sm text-amber-800">
+            Queue summary loaded for {summary.businessName}, but detailed screening records are missing.
+            Review actions stay disabled until full application data is available.
+          </p>
+        </CardHeader>
+        <CardContent className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          <ReadOnlyField label="Application ID">{summary.applicationId}</ReadOnlyField>
+          <ReadOnlyField label="Business Name">{summary.businessName}</ReadOnlyField>
+          <ReadOnlyField label="Owner">{summary.ownerName}</ReadOnlyField>
+          <ReadOnlyField label="Category">{summary.category}</ReadOnlyField>
+          <ReadOnlyField label="Date Applied">{summary.dateApplied}</ReadOnlyField>
+          <ReadOnlyField label="Location">{summary.location}</ReadOnlyField>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 /* ─── MAIN COMPONENT ─────────────────────────────────────────────── */
 export function ProviderApplicationReview() {
   const navigate = useNavigate();
   const { applicationId } = useParams<{ applicationId: string }>();
-  const application = applicationId ? mockApplications[applicationId] : null;
+  const [summaryApplication, setSummaryApplication] = useState<ProviderApplicationSummary | null>(() =>
+    applicationId ? getProviderApplicationById(applicationId) : null,
+  );
+
+  useEffect(
+    () =>
+      subscribeProviderApplications(() => {
+        setSummaryApplication(applicationId ? getProviderApplicationById(applicationId) : null);
+      }),
+    [applicationId],
+  );
+
+  const application = applicationId ? mockApplications[applicationId] ?? null : null;
+  const applicationStatus =
+    applicationId
+      ? getProviderApplicationStatus(applicationId) || summaryApplication?.status || "pending"
+      : "pending";
+  const isDecisionLocked = applicationStatus !== "pending";
 
   const [activeTab, setActiveTab] = useState("Overview");
   const [flagsExpanded, setFlagsExpanded] = useState(true);
@@ -298,6 +358,10 @@ export function ProviderApplicationReview() {
   const [govIdType, setGovIdType] = useState(application?.govIdType || "PhilSys National ID");
   const [govIdNumber, setGovIdNumber] = useState(application?.govIdNumber || "");
   const [ocrRunning, setOcrRunning] = useState(false);
+
+  if (!application && summaryApplication) {
+    return <SummaryOnlyReview summary={summaryApplication} onBack={() => navigate("/provider-applications")} />;
+  }
 
   /* ── Not Found ── */
   if (!application) {
@@ -406,9 +470,19 @@ export function ProviderApplicationReview() {
             </span>
 
             {/* Status */}
-            <Badge className="bg-amber-50 text-amber-700 border-amber-200 px-2.5 py-1">
-              <Clock className="w-3 h-3 mr-1" />Pending Review
-            </Badge>
+            {applicationStatus === "approved" ? (
+              <Badge className="bg-green-50 text-green-700 border-green-200 px-2.5 py-1">
+                <CheckCircle className="w-3 h-3 mr-1" />Approved
+              </Badge>
+            ) : applicationStatus === "rejected" ? (
+              <Badge className="bg-red-50 text-red-700 border-red-200 px-2.5 py-1">
+                <XCircle className="w-3 h-3 mr-1" />Rejected
+              </Badge>
+            ) : (
+              <Badge className="bg-amber-50 text-amber-700 border-amber-200 px-2.5 py-1">
+                <Clock className="w-3 h-3 mr-1" />Pending Review
+              </Badge>
+            )}
 
             {/* Risk */}
             {getRiskBadge(application.riskLevel)}
@@ -426,15 +500,31 @@ export function ProviderApplicationReview() {
           <Button
             variant="outline"
             className="gap-2 border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300"
-            onClick={() => setShowRejectModal(true)}
+            onClick={() => {
+              if (!isDecisionLocked) {
+                setShowRejectModal(true);
+              }
+            }}
+            disabled={isDecisionLocked}
+            title={isDecisionLocked ? "Application already reviewed" : ""}
           >
             <XCircle className="w-4 h-4" />Reject
           </Button>
           <Button
             className="gap-2 bg-[#16A34A] hover:bg-[#15803D]"
-            onClick={() => setShowApproveModal(true)}
-            disabled={!canApprove}
-            title={canApprove ? "" : "Complete all KYC verification checks first"}
+            onClick={() => {
+              if (!isDecisionLocked) {
+                setShowApproveModal(true);
+              }
+            }}
+            disabled={!canApprove || isDecisionLocked}
+            title={
+              isDecisionLocked
+                ? "Application already reviewed"
+                : canApprove
+                  ? ""
+                  : "Complete all KYC verification checks first"
+            }
           >
             <CheckCircle className="w-4 h-4" />Approve
           </Button>
@@ -975,22 +1065,42 @@ export function ProviderApplicationReview() {
               <Button
                 variant="outline"
                 className="gap-2 border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300"
-                onClick={() => setShowRejectModal(true)}
+                onClick={() => {
+                  if (!isDecisionLocked) {
+                    setShowRejectModal(true);
+                  }
+                }}
+                disabled={isDecisionLocked}
               >
                 <XCircle className="w-4 h-4" />Reject
               </Button>
               <Button
                 variant="outline"
                 className="gap-2"
-                onClick={() => setShowRequestModal(true)}
+                onClick={() => {
+                  if (!isDecisionLocked) {
+                    setShowRequestModal(true);
+                  }
+                }}
+                disabled={isDecisionLocked}
               >
                 <AlertCircle className="w-4 h-4" />Request More Info
               </Button>
               <Button
                 className="gap-2 bg-[#16A34A] hover:bg-[#15803D]"
-                onClick={() => setShowApproveModal(true)}
-                disabled={!canApprove}
-                title={canApprove ? "" : "Complete all KYC verification checklist items first"}
+                onClick={() => {
+                  if (!isDecisionLocked) {
+                    setShowApproveModal(true);
+                  }
+                }}
+                disabled={!canApprove || isDecisionLocked}
+                title={
+                  isDecisionLocked
+                    ? "Application already reviewed"
+                    : canApprove
+                      ? ""
+                      : "Complete all KYC verification checklist items first"
+                }
               >
                 <CheckCircle className="w-4 h-4" />Approve Provider
               </Button>
@@ -1130,7 +1240,14 @@ export function ProviderApplicationReview() {
             <Button variant="outline" onClick={() => setShowApproveModal(false)}>Cancel</Button>
             <Button
               className="bg-[#16A34A] hover:bg-[#15803D] gap-2"
-              onClick={() => { setShowApproveModal(false); navigate("/provider-applications"); }}
+              disabled={isDecisionLocked}
+              onClick={() => {
+                if (applicationId) {
+                  updateProviderApplicationStatus(applicationId, "approved");
+                }
+                setShowApproveModal(false);
+                navigate("/provider-applications");
+              }}
             >
               <CheckCircle className="w-4 h-4" />Confirm Approval
             </Button>
@@ -1165,8 +1282,14 @@ export function ProviderApplicationReview() {
             <Button variant="outline" onClick={() => setShowRejectModal(false)}>Cancel</Button>
             <Button
               variant="destructive"
-              disabled={!rejectionReason.trim()}
-              onClick={() => { setShowRejectModal(false); navigate("/provider-applications"); }}
+              disabled={isDecisionLocked || !rejectionReason.trim()}
+              onClick={() => {
+                if (applicationId) {
+                  updateProviderApplicationStatus(applicationId, "rejected", rejectionReason.trim());
+                }
+                setShowRejectModal(false);
+                navigate("/provider-applications");
+              }}
               className="gap-2"
             >
               <XCircle className="w-4 h-4" />Confirm Rejection
