@@ -34,7 +34,6 @@ Each card contains:
 Actions (right side):
 - Accept (primary button)
 - Reject (secondary)
-- Counter Offer (outlined button)
 
 --------------------------------------------------
 
@@ -71,32 +70,3 @@ Pricing Breakdown:
 Action Buttons (important):
 - Accept
 - Reject
-- Counter Offer (highlight this)
-
---------------------------------------------------
-
-PAGE 3: COUNTER OFFER (MODAL OR PAGE)
-
-Design as modal overlay (preferred) or separate page.
-
-Header:
-- "Send Counter Offer"
-
-Show original booking details (readonly):
-- Service
-- Original date/time
-- Original price
-
-Editable Fields:
-- Proposed date & time (datetime picker)
-- Proposed price (input)
-- Estimated duration
-- Reason for counter offer (textarea)
-- Validity period:
-  • 24 hours
-  • 48 hours
-  • 72 hours (radio buttons or pills)
-
-Buttons:
-- Send Counter Offer (primary)
-- Cancel (secondary)

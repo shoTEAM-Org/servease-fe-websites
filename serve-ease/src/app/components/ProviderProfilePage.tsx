@@ -78,7 +78,7 @@ export function ProviderProfilePage() {
   const [activeTab, setActiveTab] = useState("About");
   const isOwnProfile = true; // This would be determined by auth state
 
-  const tabs = ["About", "Services & Pricing", "Portfolio", "Reviews", "Availability"];
+  const tabs = ["About", "Services & Pricing", "Reviews", "Availability"];
 
   const badges = [
     { icon: CheckCircle2, label: "Verified", color: "#00BF63", bg: "#DCFCE7" },
@@ -902,122 +902,6 @@ export function ProviderProfilePage() {
                           <Edit2 style={{ width: "14px", height: "14px" }} />
                           Edit Service
                         </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {activeTab === "Portfolio" && (
-            <div>
-              {providerData.portfolioItems.length === 0 ? (
-                <div style={styles.card}>
-                  <h2
-                    style={{
-                      fontSize: "20px",
-                      fontWeight: "bold",
-                      color: "#111827",
-                      marginBottom: "24px",
-                    }}
-                  >
-                    Portfolio
-                  </h2>
-                  <p style={{ fontSize: "15px", color: "#6B7280" }}>
-                    No portfolio items available yet.
-                  </p>
-                </div>
-              ) : (
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "24px" }}>
-                  {providerData.portfolioItems.map((item) => (
-                    <div
-                      key={item.id}
-                      style={{
-                        backgroundColor: "white",
-                        borderRadius: "16px",
-                        boxShadow: "0 1px 3px rgba(0, 0, 0, 0.1)",
-                        border: "1px solid #F3F4F6",
-                        overflow: "hidden",
-                        cursor: "pointer",
-                        transition: "all 0.3s ease",
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.boxShadow = "0 4px 12px rgba(0, 0, 0, 0.15)";
-                        e.currentTarget.style.transform = "translateY(-4px)";
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.boxShadow = "0 1px 3px rgba(0, 0, 0, 0.1)";
-                        e.currentTarget.style.transform = "translateY(0)";
-                      }}
-                    >
-                      <div
-                        style={{
-                          width: "100%",
-                          height: "200px",
-                          overflow: "hidden",
-                          backgroundColor: "#F3F4F6",
-                        }}
-                      >
-                        <ImageWithFallback
-                          src={item.imageUrl}
-                          alt={item.title}
-                          style={{
-                            width: "100%",
-                            height: "100%",
-                            objectFit: "cover",
-                          }}
-                        />
-                      </div>
-                      <div style={{ padding: "16px" }}>
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start", marginBottom: "8px" }}>
-                          <h3
-                            style={{
-                              fontSize: "16px",
-                              fontWeight: "bold",
-                              color: "#111827",
-                            }}
-                          >
-                            {item.title}
-                          </h3>
-                          {item.featured && (
-                            <span
-                              style={{
-                                padding: "4px 8px",
-                                borderRadius: "6px",
-                                fontSize: "10px",
-                                fontWeight: "600",
-                                backgroundColor: "#FEF3C7",
-                                color: "#92400E",
-                              }}
-                            >
-                              Featured
-                            </span>
-                          )}
-                        </div>
-                        <p
-                          style={{
-                            fontSize: "13px",
-                            color: "#6B7280",
-                            marginBottom: "8px",
-                            lineHeight: "1.5",
-                          }}
-                        >
-                          {item.description}
-                        </p>
-                        <span
-                          style={{
-                            display: "inline-block",
-                            padding: "4px 10px",
-                            borderRadius: "6px",
-                            fontSize: "11px",
-                            fontWeight: "600",
-                            backgroundColor: "#F0FDF8",
-                            color: "#00BF63",
-                          }}
-                        >
-                          {item.category}
-                        </span>
                       </div>
                     </div>
                   ))}

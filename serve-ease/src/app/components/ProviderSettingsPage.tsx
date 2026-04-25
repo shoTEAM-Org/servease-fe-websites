@@ -346,29 +346,6 @@ export function ProviderSettingsPage() {
                 </div>
               </div>
 
-              {/* Link to detailed preferences */}
-              <Link
-                to="/provider/notification-preferences"
-                style={{
-                  ...styles.linkItem,
-                  marginTop: "8px",
-                  marginBottom: "0",
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = "#F0FDF4";
-                  e.currentTarget.style.borderColor = "#00BF63";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = "#FAFAFA";
-                  e.currentTarget.style.borderColor = "#F3F4F6";
-                }}
-              >
-                <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                  <SettingsIcon style={{ width: "18px", height: "18px", color: "#6B7280" }} />
-                  <span style={{ fontSize: "14px", fontWeight: "600", color: "#111827" }}>Notification Preferences</span>
-                </div>
-                <ChevronRight style={{ width: "18px", height: "18px", color: "#9CA3AF" }} />
-              </Link>
             </div>
           </div>
         </div>

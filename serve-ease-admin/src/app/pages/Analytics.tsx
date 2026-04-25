@@ -63,21 +63,21 @@ const userGrowth = [
 ];
 
 const moduleRevenue = [
-  { month: "Jan", marketplace: 45000, grocery: 32000, restaurant: 28000 },
-  { month: "Feb", marketplace: 52000, grocery: 38000, restaurant: 32000 },
-  { month: "Mar", marketplace: 48000, grocery: 35000, restaurant: 29000 },
-  { month: "Apr", marketplace: 61000, grocery: 42000, restaurant: 38000 },
-  { month: "May", marketplace: 55000, grocery: 39000, restaurant: 34000 },
-  { month: "Jun", marketplace: 67000, grocery: 48000, restaurant: 42000 },
+  { month: "Jan", cleaning: 45000, plumbing: 32000, electrical: 28000 },
+  { month: "Feb", cleaning: 52000, plumbing: 38000, electrical: 32000 },
+  { month: "Mar", cleaning: 48000, plumbing: 35000, electrical: 29000 },
+  { month: "Apr", cleaning: 61000, plumbing: 42000, electrical: 38000 },
+  { month: "May", cleaning: 55000, plumbing: 39000, electrical: 34000 },
+  { month: "Jun", cleaning: 67000, plumbing: 48000, electrical: 42000 },
 ];
 
 const orderDistribution = [
-  { name: "Marketplace", value: 35, color: "#3b82f6" },
-  { name: "Grocery", value: 25, color: "#10b981" },
-  { name: "Restaurant", value: 20, color: "#f59e0b" },
-  { name: "Pharmacy", value: 10, color: "#ef4444" },
-  { name: "Hospital", value: 6, color: "#8b5cf6" },
-  { name: "Taxi", value: 4, color: "#06b6d4" },
+  { name: "Cleaning", value: 35, color: "#3b82f6" },
+  { name: "Plumbing", value: 25, color: "#10b981" },
+  { name: "Electrical", value: 20, color: "#f59e0b" },
+  { name: "Appliance Repair", value: 10, color: "#ef4444" },
+  { name: "Beauty", value: 6, color: "#8b5cf6" },
+  { name: "Handyman", value: 4, color: "#06b6d4" },
 ];
 
 const peakHours = [
@@ -96,7 +96,7 @@ export function Analytics() {
       <div>
         <h1 className="text-3xl font-bold text-gray-900">Analytics & Insights</h1>
         <p className="text-gray-500 mt-1">
-          Comprehensive analytics across all modules and operations
+          Comprehensive analytics across bookings, services, and operations
         </p>
       </div>
 
@@ -165,7 +165,7 @@ export function Analytics() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Order Distribution by Module</CardTitle>
+            <CardTitle>Booking Distribution by Service</CardTitle>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
@@ -195,7 +195,7 @@ export function Analytics() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Revenue by Module</CardTitle>
+          <CardTitle>Revenue by Service</CardTitle>
         </CardHeader>
         <CardContent>
           <ResponsiveContainer width="100%" height={300}>
@@ -205,9 +205,9 @@ export function Analytics() {
               <YAxis stroke="#6b7280" />
               <Tooltip />
               <Legend />
-              <Bar dataKey="marketplace" fill="#3b82f6" name="Marketplace" />
-              <Bar dataKey="grocery" fill="#10b981" name="Grocery" />
-              <Bar dataKey="restaurant" fill="#f59e0b" name="Restaurant" />
+              <Bar dataKey="cleaning" fill="#3b82f6" name="Cleaning" />
+              <Bar dataKey="plumbing" fill="#10b981" name="Plumbing" />
+              <Bar dataKey="electrical" fill="#f59e0b" name="Electrical" />
             </BarChart>
           </ResponsiveContainer>
         </CardContent>

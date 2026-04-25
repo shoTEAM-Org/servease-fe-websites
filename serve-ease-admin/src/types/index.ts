@@ -108,6 +108,7 @@ export interface Dispute {
   description: string;
   amount: number;
   status: DisputeStatus;
+  priority?: string;
   createdAt: string;
   resolvedAt?: string;
   resolution?: string;

@@ -458,7 +458,7 @@ export function CancelBookingPage() {
             </li>
             <li style={styles.policyItem}>
               <strong>Customer Notification:</strong> The customer will be immediately
-              notified and can request a refund or reschedule with another provider
+              notified and can book another provider
             </li>
             <li style={styles.policyItem}>
               <strong>Refund to Customer:</strong> ₱

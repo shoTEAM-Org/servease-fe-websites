@@ -111,6 +111,8 @@ const scheduledReportsData = [
 export function BusinessReports({ hideHeader = false }: { hideHeader?: boolean }) {
   const [isGenerateModalOpen, setIsGenerateModalOpen] = useState(false);
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
+  const [, setSelectedSchedule] = useState<any>(null);
+  const [, setIsEditScheduleOpen] = useState(false);
 
   // Generate report form
   const [generateForm, setGenerateForm] = useState({

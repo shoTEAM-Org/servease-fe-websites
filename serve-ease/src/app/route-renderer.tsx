@@ -8,19 +8,15 @@ import { BookingRequestsPage } from "./components/BookingRequestsPage";
 import { BlockTimePage } from "./components/BlockTimePage";
 import { CalendarPage } from "./components/CalendarPage";
 import { CancelBookingPage } from "./components/CancelBookingPage";
-import { CounterOfferModalPage } from "./components/CounterOfferModalPage";
-import { CounterOfferPage } from "./components/CounterOfferPage";
 import { DashboardPage } from "./components/DashboardPage";
 import { EditProfilePage } from "./components/EditProfilePage";
 import { EditServicesPricingPage } from "./components/EditServicesPricingPage";
 import { Layout } from "./components/Layout";
 import { LoginPage } from "./components/LoginPage";
 import { MessagesPage } from "./components/MessagesPage";
-import { NotificationPreferencesPage } from "./components/NotificationPreferencesPage";
 import { OnboardingPage } from "./components/OnboardingPage";
 import { PayoutConfirmationPage } from "./components/PayoutConfirmationPage";
 import { PayoutPage } from "./components/PayoutPage";
-import { PortfolioManagementPage } from "./components/PortfolioManagementPage";
 import { ProviderAnalyticsPage } from "./components/ProviderAnalyticsPage";
 import { ProviderEarningsDashboard } from "./components/ProviderEarningsDashboard";
 import { ProviderEarningsDetails } from "./components/ProviderEarningsDetails";
@@ -57,9 +53,7 @@ const ROUTES: RouteEntry[] = [
   { path: "/provider/requests", component: BookingRequestsPage, layout: true },
   { path: "/provider/booking-details/:id", component: BookingDetailsPage, layout: true },
   { path: "/provider/request-details/:id", component: BookingRequestDetailsPage, layout: true },
-  { path: "/provider/counter-offer/:id", component: CounterOfferModalPage, layout: true },
   { path: "/provider/cancel-booking/:id", component: CancelBookingPage, layout: true },
-  { path: "/provider/counter-offer", component: CounterOfferPage, layout: true },
   { path: "/provider/earningsdashboard", component: ProviderEarningsDashboard, layout: true },
   { path: "/provider/earningsdetails", component: ProviderEarningsDetails, layout: true },
   { path: "/provider/reviews", component: ProviderReviewsPage, layout: true },
@@ -74,15 +68,9 @@ const ROUTES: RouteEntry[] = [
   { path: "/provider/profile", component: ProviderProfilePage, layout: true },
   { path: "/provider/edit-profile", component: EditProfilePage, layout: true },
   { path: "/provider/edit-services", component: EditServicesPricingPage, layout: true },
-  { path: "/provider/portfolio", component: PortfolioManagementPage, layout: true },
   { path: "/provider/settings", component: ProviderSettingsPage, layout: true },
   { path: "/provider/help-center", component: ProviderHelpCenterPage, layout: true },
   { path: "/provider/messages", component: MessagesPage, layout: true },
-  {
-    path: "/provider/notification-preferences",
-    component: NotificationPreferencesPage,
-    layout: true,
-  },
 ];
 
 function normalizePath(pathname: string) {

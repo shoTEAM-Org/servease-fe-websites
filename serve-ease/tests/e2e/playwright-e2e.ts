@@ -1,19 +1,25 @@
 import { spawn } from 'node:child_process';
 import process from 'node:process';
-import { chromium, firefox, webkit } from 'playwright';
+import { chromium, firefox, webkit, type Browser, type Page } from 'playwright';
 
 type BrowserName = 'chromium' | 'firefox' | 'webkit';
 
-const LOCAL_PAGE_MARKERS = ['Get started by editing', 'To get started, edit the page.tsx file.'];
+type RouteCheck = {
+  path: string;
+  markers: string[];
+};
 
-function hasExpectedLandingMarker(text: string): boolean {
-  return LOCAL_PAGE_MARKERS.some((marker) => text.includes(marker));
-}
+const ROUTES: RouteCheck[] = [
+  { path: '/login', markers: ['Provider Login', 'Manage Bookings'] },
+  { path: '/provider/dashboard', markers: ['Quick Actions', 'Upcoming Bookings'] },
+  { path: '/provider/bookings', markers: ['Bookings & Requests'] },
+  { path: '/provider/calendar', markers: ['Calendar', 'Manage your bookings'] },
+  { path: '/provider/messages', markers: ['Messages'] },
+  { path: '/provider/earningsdashboard', markers: ['Earnings Dashboard'] },
+];
 
 function isProtectedPreview(status: number | undefined, text: string): boolean {
-  if (status === 401 || status === 403) {
-    return true;
-  }
+  if (status === 401 || status === 403) return true;
 
   const normalized = text.toLowerCase();
   return (
@@ -25,14 +31,10 @@ function isProtectedPreview(status: number | undefined, text: string): boolean {
 }
 
 function resolveBrowser(name: string): BrowserName {
-  if (name === 'firefox' || name === 'webkit') {
-    return name;
-  }
-
-  return 'chromium';
+  return name === 'firefox' || name === 'webkit' ? name : 'chromium';
 }
 
-function launchBrowser(name: BrowserName) {
+function launchBrowser(name: BrowserName): Promise<Browser> {
   switch (name) {
     case 'firefox':
       return firefox.launch({ headless: true });
@@ -43,16 +45,13 @@ function launchBrowser(name: BrowserName) {
   }
 }
 
-async function waitForServer(url: string, timeoutMs = 45_000): Promise<void> {
+async function waitForServer(url: string, timeoutMs: number): Promise<void> {
   const startedAt = Date.now();
 
   while (Date.now() - startedAt < timeoutMs) {
     try {
       const res = await fetch(url, { method: 'GET' });
-      // For deployment URLs, a protected preview can legitimately return 401/403.
-      if (res.status >= 200 && res.status < 500) {
-        return;
-      }
+      if (res.status >= 200 && res.status < 500) return;
     } catch {
       // server is not ready yet
     }
@@ -61,6 +60,54 @@ async function waitForServer(url: string, timeoutMs = 45_000): Promise<void> {
   }
 
   throw new Error(`Timed out waiting for server at ${url}`);
+}
+
+async function assertRoute(page: Page, baseUrl: string, route: RouteCheck) {
+  const consoleErrors: string[] = [];
+  const pageErrors: string[] = [];
+
+  page.on('console', (message) => {
+    if (message.type() === 'error') {
+      consoleErrors.push(message.text());
+    }
+  });
+  page.on('pageerror', (error) => pageErrors.push(error.message));
+
+  const response = await page.goto(`${baseUrl}${route.path}`, {
+    waitUntil: 'domcontentloaded',
+  });
+  await page.waitForTimeout(750);
+
+  const status = response?.status();
+  const text = (await page.textContent('body')) || '';
+  if (!status || status >= 400) {
+    throw new Error(`${route.path} returned status ${status ?? 'unknown'}`);
+  }
+  if (text.includes('Page not found')) {
+    throw new Error(`${route.path} rendered the not-found page`);
+  }
+  for (const marker of route.markers) {
+    if (!text.includes(marker)) {
+      throw new Error(`${route.path} missing expected marker: ${marker}`);
+    }
+  }
+  if (consoleErrors.length > 0 || pageErrors.length > 0) {
+    throw new Error(
+      `${route.path} had browser errors: ${[...consoleErrors, ...pageErrors].join(' | ')}`,
+    );
+  }
+}
+
+function stopApp(app: ReturnType<typeof spawn> | null) {
+  if (!app?.pid) return;
+  if (process.platform === 'win32') {
+    spawn('taskkill', ['/pid', String(app.pid), '/T', '/F'], {
+      shell: true,
+      stdio: 'ignore',
+    });
+    return;
+  }
+  app.kill('SIGTERM');
 }
 
 async function main() {
@@ -84,25 +131,27 @@ async function main() {
     const browser = await launchBrowser(browserName);
     try {
       const page = await browser.newPage();
-      const response = await page.goto(baseUrl, { waitUntil: 'domcontentloaded' });
-      const status = response?.status();
-      const text = (await page.textContent('body')) || '';
-
-      if (isExternalTarget && isProtectedPreview(status, text)) {
-        console.log(`Playwright smoke reached protected preview on ${browserName} (status: ${status ?? 'unknown'})`);
+      const firstResponse = await page.goto(baseUrl, { waitUntil: 'domcontentloaded' });
+      const firstText = (await page.textContent('body')) || '';
+      if (isExternalTarget && isProtectedPreview(firstResponse?.status(), firstText)) {
+        console.log(
+          `Provider web smoke reached protected preview on ${browserName} (status: ${
+            firstResponse?.status() ?? 'unknown'
+          })`,
+        );
         return;
       }
 
-      if (!hasExpectedLandingMarker(text)) {
-        throw new Error(`Expected landing page content was not found (status: ${status ?? 'unknown'})`);
+      for (const route of ROUTES) {
+        await assertRoute(page, baseUrl, route);
       }
     } finally {
       await browser.close();
     }
 
-    console.log(`Playwright smoke test passed on ${browserName}`);
+    console.log(`Provider web smoke passed on ${browserName}`);
   } finally {
-    app?.kill();
+    stopApp(app);
   }
 }
 

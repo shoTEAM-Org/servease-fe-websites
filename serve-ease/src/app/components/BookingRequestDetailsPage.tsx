@@ -414,10 +414,6 @@ export function BookingRequestDetailsPage() {
     navigate("/provider/requests");
   };
 
-  const handleCounterOffer = () => {
-    navigate(`/provider/counter-offer/${id}`);
-  };
-
   const initials = request.customer.name
     .split(" ")
     .map((n) => n[0])
@@ -450,7 +446,7 @@ export function BookingRequestDetailsPage() {
           <AlertCircle size={18} style={{ marginTop: "2px", flexShrink: 0 }} />
           <div>
             <strong>Action Required:</strong> This customer is waiting for your response. 
-            Please accept, reject, or send a counter offer within 24 hours.
+            Please accept or reject within 24 hours.
           </div>
         </div>
 
@@ -653,17 +649,6 @@ export function BookingRequestDetailsPage() {
                 <button
                   style={{
                     ...styles.button,
-                    ...styles.outlinedButton,
-                    gridColumn: "1 / -1",
-                    fontSize: "15px",
-                  }}
-                  onClick={handleCounterOffer}
-                >
-                  Counter Offer
-                </button>
-                <button
-                  style={{
-                    ...styles.button,
                     ...styles.dangerButton,
                     gridColumn: "1 / -1",
                   }}
@@ -674,19 +659,6 @@ export function BookingRequestDetailsPage() {
                 </button>
               </div>
 
-              <div
-                style={{
-                  marginTop: "20px",
-                  padding: "12px",
-                  backgroundColor: "#FEF3C7",
-                  borderRadius: "8px",
-                  fontSize: "12px",
-                  color: "#92400E",
-                  textAlign: "center",
-                }}
-              >
-                💡 Tip: Send a counter offer if you need to adjust the date, time, or price
-              </div>
             </div>
           </div>
         </div>

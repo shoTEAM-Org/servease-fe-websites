@@ -87,7 +87,7 @@ const styles = {
     gap: "8px",
     marginBottom: "24px",
     borderBottomColor: "#F3F4F6",
-    borderBottomStyle: "solid",
+    borderBottomStyle: "solid" as const,
     borderBottomWidth: "2px",
     paddingBottom: "0px",
   },
@@ -100,7 +100,7 @@ const styles = {
     backgroundColor: "transparent",
     color: "#6B7280",
     borderBottomColor: "transparent",
-    borderBottomStyle: "solid",
+    borderBottomStyle: "solid" as const,
     borderBottomWidth: "3px",
     transition: "all 0.3s ease",
     display: "flex",
@@ -482,11 +482,6 @@ export function UnifiedBookingsPage() {
     console.log("Reject request:", itemId);
   };
 
-  const handleCounterOffer = (itemId: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    navigate(`/provider/counter-offer/${itemId}`);
-  };
-
   const renderCard = (item: Item) => {
     const initials = item.customerName
       .split(" ")
@@ -549,12 +544,6 @@ export function UnifiedBookingsPage() {
                 onClick={(e) => handleAccept(item.id, e)}
               >
                 Accept
-              </button>
-              <button
-                style={{ ...styles.button, ...styles.outlinedButton, padding: "8px 16px" }}
-                onClick={(e) => handleCounterOffer(item.id, e)}
-              >
-                Counter Offer
               </button>
               <button
                 style={{ ...styles.button, ...styles.dangerButton, padding: "8px 16px" }}

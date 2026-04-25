@@ -1,14 +1,5 @@
 import { createContext, useContext, useState, ReactNode } from "react";
 
-interface PortfolioItem {
-  id: string;
-  title: string;
-  description: string;
-  category: string;
-  imageUrl: string;
-  featured: boolean;
-}
-
 interface Service {
   id: string;
   name: string;
@@ -22,13 +13,8 @@ interface Service {
 
 interface ProviderProfile {
   businessName: string;
-  bio: string;
-  serviceAreas: string;
+  serviceDescription: string;
   yearsExperience: string;
-  languages: string[];
-  facebook: string;
-  instagram: string;
-  website: string;
   coverPhotoUrl: string;
   profilePhotoUrl: string;
 }
@@ -43,7 +29,6 @@ interface DaySchedule {
 
 interface ProviderData {
   blockedDates: string[];
-  portfolioItems: PortfolioItem[];
   services: Service[];
   profile: ProviderProfile;
   availability: { [key: string]: DaySchedule };
@@ -55,8 +40,6 @@ interface ProviderDataContextType {
   blockedDates: string[];
   addBlockedDates: (dates: string[]) => void;
   removeBlockedDate: (date: string) => void;
-  portfolioItems: PortfolioItem[];
-  setPortfolioItems: (items: PortfolioItem[]) => void;
   services: Service[];
   setServices: (services: Service[]) => void;
   profile: ProviderProfile;
@@ -68,24 +51,6 @@ const ProviderDataContext = createContext<ProviderDataContextType | undefined>(u
 export function ProviderDataProvider({ children }: { children: ReactNode }) {
   const [providerData, setProviderData] = useState<ProviderData>({
     blockedDates: ["2026-03-25", "2026-03-26"],
-    portfolioItems: [
-      {
-        id: "1",
-        title: "Modern Office Renovation",
-        description: "Complete office deep cleaning and sanitization",
-        category: "Commercial Cleaning",
-        imageUrl: "https://images.unsplash.com/photo-1497366216548-37526070297c?w=800",
-        featured: true,
-      },
-      {
-        id: "2",
-        title: "Residential Deep Cleaning",
-        description: "3-bedroom house complete cleaning service",
-        category: "Residential Cleaning",
-        imageUrl: "https://images.unsplash.com/photo-1484154218962-a197022b5858?w=800",
-        featured: false,
-      },
-    ],
     services: [
       {
         id: "1",
@@ -120,13 +85,8 @@ export function ProviderDataProvider({ children }: { children: ReactNode }) {
     ],
     profile: {
       businessName: "Juan's Professional Cleaning",
-      bio: "With over 8 years of professional cleaning experience, I take pride in delivering exceptional service to every client.",
-      serviceAreas: "Metro Manila, Philippines",
+      serviceDescription: "With over 8 years of professional cleaning experience, I take pride in delivering exceptional service to every client.",
       yearsExperience: "8",
-      languages: ["English", "Filipino"],
-      facebook: "",
-      instagram: "",
-      website: "",
       coverPhotoUrl: "https://images.unsplash.com/photo-1640963269654-3fe248c5fba6?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxhYnN0cmFjdCUyMGdyYWRpZW50JTIwYmFja2dyb3VuZHxlbnwxfHx8fDE3NzM5MzU3NDl8MA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
       profilePhotoUrl: "https://images.unsplash.com/photo-1770392988936-dc3d8581e0c9?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxwcm9mZXNzaW9uYWwlMjBhc2lhbiUyMG1hbGUlMjBwb3J0cmFpdHxlbnwxfHx8fDE3NzM4OTQ1Nzl8MA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
     },
@@ -212,9 +172,6 @@ export function ProviderDataProvider({ children }: { children: ReactNode }) {
         blockedDates: providerData.blockedDates,
         addBlockedDates,
         removeBlockedDate,
-        portfolioItems: providerData.portfolioItems,
-        setPortfolioItems: (items) =>
-          setProviderData((prev) => ({ ...prev, portfolioItems: items })),
         services: providerData.services,
         setServices: (services) =>
           setProviderData((prev) => ({ ...prev, services: services })),

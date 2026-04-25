@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Search, Send, Paperclip, ExternalLink, Star } from 'lucide-react';
 
-// Styles object for reusability - matching CounterOfferPage aesthetic
+// Styles object for reusability across the provider web app.
 const styles = {
   container: {
     height: '100vh',

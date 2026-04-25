@@ -2,7 +2,6 @@ import { createBrowserRouter } from "react-router";
 import { Layout } from "./components/Layout";
 import { LoginPage } from "./components/LoginPage";
 import { DashboardPage } from "./components/DashboardPage";
-import { CounterOfferPage } from "./components/CounterOfferPage";
 import { ProviderEarningsDashboard } from "./components/ProviderEarningsDashboard";
 import { ProviderEarningsDetails } from "./components/ProviderEarningsDetails";
 import { ProviderReviewsPage } from "./components/ProviderReviewsPage";
@@ -15,17 +14,14 @@ import { PayoutConfirmationPage } from "./components/PayoutConfirmationPage";
 import { ProviderProfilePage } from "./components/ProviderProfilePage";
 import { EditProfilePage } from "./components/EditProfilePage";
 import { EditServicesPricingPage } from "./components/EditServicesPricingPage";
-import { PortfolioManagementPage } from "./components/PortfolioManagementPage";
 import { ProviderSettingsPage } from "./components/ProviderSettingsPage";
 import { ProviderHelpCenterPage } from "./components/ProviderHelpCenterPage";
 import { MessagesPage } from "./components/MessagesPage";
-import { NotificationPreferencesPage } from "./components/NotificationPreferencesPage";
 import { ProviderPerformanceInsightsPage } from "./components/ProviderPerformanceInsightsPage";
 import { OnboardingPage } from "./components/OnboardingPage";
 import { UnifiedBookingsPage } from "./components/UnifiedBookingsPage";
 import { BookingDetailsPage } from "./components/BookingDetailsPage";
 import { BookingRequestDetailsPage } from "./components/BookingRequestDetailsPage";
-import { CounterOfferModalPage } from "./components/CounterOfferModalPage";
 import { CancelBookingPage } from "./components/CancelBookingPage";
 import { ProviderAnalyticsPage } from "./components/ProviderAnalyticsPage";
 
@@ -55,16 +51,8 @@ export const router = createBrowserRouter([
         Component: BookingRequestDetailsPage,
       },
       {
-        path: "provider/counter-offer/:id",
-        Component: CounterOfferModalPage,
-      },
-      {
         path: "provider/cancel-booking/:id",
         Component: CancelBookingPage,
-      },
-      {
-        path: "provider/counter-offer",
-        Component: CounterOfferPage,
       },
       {
         path: "provider/earningsdashboard",
@@ -123,10 +111,6 @@ export const router = createBrowserRouter([
         Component: EditServicesPricingPage,
       },
       {
-        path: "provider/portfolio",
-        Component: PortfolioManagementPage,
-      },
-      {
         path: "provider/settings",
         Component: ProviderSettingsPage,
       },
@@ -137,10 +121,6 @@ export const router = createBrowserRouter([
       {
         path: "provider/messages",
         Component: MessagesPage,
-      },
-      {
-        path: "provider/notification-preferences",
-        Component: NotificationPreferencesPage,
       },
       {
         index: true,

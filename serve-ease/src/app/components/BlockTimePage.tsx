@@ -484,7 +484,7 @@ export function BlockTimePage() {
             <p style={{ fontSize: "13px", color: "#7F1D1D", lineHeight: "1.6" }}>
               Blocking time will prevent new bookings during the selected period. Existing
               bookings will not be affected. You'll need to contact customers directly to
-              reschedule if needed.
+              adjust availability if needed.
             </p>
           </div>
         </div>

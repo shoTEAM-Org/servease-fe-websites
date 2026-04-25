@@ -86,7 +86,6 @@ const roles = [
       "Approve/reject KYC documents",
       "Moderate product listings",
       "Manage categories",
-      "Manage promotions",
     ],
   },
 ];
@@ -157,7 +156,7 @@ export function AddNewAdmin() {
       toast.info("Invitation email sent to " + email);
     }
     setTimeout(() => {
-      navigate("/admin-roles");
+      navigate("/settings");
     }, 1500);
   };
 
@@ -170,7 +169,7 @@ export function AddNewAdmin() {
         <Button
           variant="outline"
           size="icon"
-          onClick={() => navigate("/admin-roles")}
+          onClick={() => navigate("/settings")}
         >
           <ArrowLeft className="w-4 h-4" />
         </Button>
@@ -416,7 +415,7 @@ export function AddNewAdmin() {
             <Button
               type="button"
               variant="outline"
-              onClick={() => navigate("/admin-roles")}
+              onClick={() => navigate("/settings")}
             >
               Cancel
             </Button>

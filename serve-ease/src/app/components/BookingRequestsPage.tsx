@@ -442,11 +442,6 @@ export function BookingRequestsPage() {
     // Handle reject logic
   };
 
-  const handleCounterOffer = (requestId: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    navigate(`/provider/counter-offer/${requestId}`);
-  };
-
   const renderRequestCard = (request: BookingRequest) => {
     const initials = request.customerName
       .split(" ")
@@ -506,12 +501,6 @@ export function BookingRequestsPage() {
                 onClick={(e) => handleAccept(request.id, e)}
               >
                 Accept
-              </button>
-              <button
-                style={{ ...styles.button, ...styles.outlinedButton, padding: "8px 16px" }}
-                onClick={(e) => handleCounterOffer(request.id, e)}
-              >
-                Counter Offer
               </button>
               <button
                 style={{ ...styles.button, ...styles.dangerButton, padding: "8px 16px" }}

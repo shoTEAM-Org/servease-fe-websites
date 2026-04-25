@@ -65,36 +65,36 @@ const revenueData = [
   { month: "Jun", revenue: 168000, commission: 16800 },
 ];
 
-const moduleCommissions = [
-  { module: "Marketplace", commission: 45230, percentage: "10%" },
-  { module: "Grocery", commission: 32890, percentage: "8%" },
-  { module: "Restaurant", commission: 28450, percentage: "12%" },
-  { module: "Pharmacy", commission: 18900, percentage: "7%" },
-  { module: "Hospital", commission: 12340, percentage: "15%" },
-  { module: "Taxi", commission: 7868, percentage: "20%" },
+const serviceCommissions = [
+  { service: "Cleaning", commission: 45230, percentage: "10%" },
+  { service: "Plumbing", commission: 32890, percentage: "10%" },
+  { service: "Electrical", commission: 28450, percentage: "10%" },
+  { service: "Appliance Repair", commission: 18900, percentage: "10%" },
+  { service: "Beauty", commission: 12340, percentage: "10%" },
+  { service: "Handyman", commission: 7868, percentage: "10%" },
 ];
 
 const pendingSettlements = [
   {
     id: "ST-001",
-    seller: "TechStore Pro",
-    module: "Marketplace",
+    provider: "Sparkle Home Cleaning",
+    service: "Cleaning",
     amount: "$4,523",
     dueDate: "2026-02-10",
     status: "pending",
   },
   {
     id: "ST-002",
-    seller: "Fresh Mart 24",
-    module: "Grocery",
+    provider: "PipeFix Services",
+    service: "Plumbing",
     amount: "$3,289",
     dueDate: "2026-02-11",
     status: "pending",
   },
   {
     id: "ST-003",
-    seller: "Gourmet Kitchen",
-    module: "Restaurant",
+    provider: "BrightWire Electrical",
+    service: "Electrical",
     amount: "$2,845",
     dueDate: "2026-02-09",
     status: "overdue",
@@ -170,17 +170,17 @@ export function Finance() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Commission by Module</CardTitle>
+            <CardTitle>Commission by Service</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {moduleCommissions.map((item) => (
+              {serviceCommissions.map((item) => (
                 <div
-                  key={item.module}
+                  key={item.service}
                   className="flex items-center justify-between p-3 border border-gray-200 rounded-lg"
                 >
                   <div>
-                    <p className="font-medium text-gray-900">{item.module}</p>
+                    <p className="font-medium text-gray-900">{item.service}</p>
                     <p className="text-xs text-gray-500">Commission Rate: {item.percentage}</p>
                   </div>
                   <p className="font-semibold text-green-600">
@@ -207,13 +207,13 @@ export function Finance() {
                 <div className="flex items-center justify-between">
                   <div className="flex-1">
                     <div className="flex items-center gap-3 mb-2">
-                      <h3 className="font-semibold text-gray-900">{settlement.seller}</h3>
+                      <h3 className="font-semibold text-gray-900">{settlement.provider}</h3>
                       <Badge
                         variant={settlement.status === "overdue" ? "destructive" : "secondary"}
                       >
                         {settlement.status}
                       </Badge>
-                      <Badge variant="outline">{settlement.module}</Badge>
+                      <Badge variant="outline">{settlement.service}</Badge>
                     </div>
                     <div className="flex items-center gap-4 text-sm text-gray-600">
                       <span>ID: {settlement.id}</span>

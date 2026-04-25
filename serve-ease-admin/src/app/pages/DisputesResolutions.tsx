@@ -47,7 +47,7 @@ export function DisputesResolutions() {
         provider?.businessName.toLowerCase().includes(searchTerm.toLowerCase());
 
       const matchesStatus = statusFilter === "all" || dispute.status === statusFilter;
-      const matchesPriority = priorityFilter === "all" || dispute.priority === priorityFilter;
+      const matchesPriority = priorityFilter === "all" || (dispute.priority || "normal") === priorityFilter;
 
       return matchesSearch && matchesStatus && matchesPriority;
     });
@@ -57,7 +57,7 @@ export function DisputesResolutions() {
     return {
       total: disputes.length,
       open: disputes.filter((d) => d.status === "Open").length,
-      investigating: disputes.filter((d) => d.status === "Investigating").length,
+      investigating: disputes.filter((d) => d.status === "Under Review").length,
       resolved: disputes.filter((d) => d.status === "Resolved").length,
     };
   }, [disputes]);
@@ -71,7 +71,7 @@ export function DisputesResolutions() {
             Open
           </Badge>
         );
-      case "Investigating":
+      case "Under Review":
         return (
           <Badge className="bg-blue-100 text-blue-700 border-blue-200">
             <AlertTriangle className="w-3 h-3 mr-1" />
@@ -285,7 +285,7 @@ export function DisputesResolutions() {
                           </span>
                         </TableCell>
                         <TableCell>{getStatusBadge(dispute.status)}</TableCell>
-                        <TableCell>{getPriorityBadge(dispute.priority)}</TableCell>
+                        <TableCell>{getPriorityBadge(dispute.priority || "normal")}</TableCell>
                         <TableCell>
                           <Button size="sm" variant="outline">
                             View Details

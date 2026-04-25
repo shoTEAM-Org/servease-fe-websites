@@ -7,7 +7,6 @@ import { RootLayout } from "./components/layouts/RootLayout";
 import { AddNewAdmin } from "./pages/AddNewAdmin";
 import { AllBookings } from "./pages/AllBookings";
 import { Categories } from "./pages/Categories";
-import { CommissionRules } from "./pages/CommissionRules";
 import { Dashboard } from "./pages/Dashboard";
 import { DisputesResolutions } from "./pages/DisputesResolutions";
 import { FailedPayments } from "./pages/FailedPayments";
@@ -15,19 +14,10 @@ import { Finance } from "./pages/Finance";
 import { ForgotPassword } from "./pages/ForgotPassword";
 import { OngoingServices } from "./pages/OngoingServices";
 import { PayoutRequests } from "./pages/PayoutRequests";
-import {
-  AdminRoles,
-  AuditTrail,
-  Integrations,
-  NotificationSettings,
-  SecuritySettings,
-} from "./pages/PlatformSettingsPages";
 import { Profile } from "./pages/Profile";
-import { Promotions } from "./pages/Promotions";
 import { ProviderApplicationReview } from "./pages/ProviderApplicationReview";
 import { ProviderApplications } from "./pages/ProviderApplications";
 import { ProviderEarnings } from "./pages/ProviderEarnings";
-import { RefundManagement } from "./pages/RefundManagement";
 import {
   BookingAnalytics,
   BusinessReports,
@@ -37,14 +27,13 @@ import {
   Revenue,
   UserReports,
 } from "./pages/reports";
-import { Security } from "./pages/Security";
 import { ServiceAreas } from "./pages/ServiceAreas";
 import { ServiceProviderDetails } from "./pages/ServiceProviderDetails";
 import { ServiceProviders } from "./pages/ServiceProviders";
 import { Services } from "./pages/Services";
 import { Settings } from "./pages/Settings";
+import { SupportTickets } from "./pages/SupportTickets";
 import { Transactions } from "./pages/Transactions";
-import { Broadcasts, Customers, Support } from "./pages/PlaceholderPages";
 import { Login } from "./pages/Login";
 import { Navigate, RouteContextProvider } from "@/lib/react-router-compat";
 
@@ -69,8 +58,6 @@ const ROUTES: RouteEntry[] = [
   { path: "/dashboard", component: Dashboard, protected: true, layout: true },
   { path: "/profile", component: Profile, protected: true, layout: true },
   { path: "/settings", component: Settings, protected: true, layout: true },
-  { path: "/security", component: Security, protected: true, layout: true },
-  { path: "/customers", component: Customers, protected: true, layout: true },
   { path: "/service-providers", component: ServiceProviders, protected: true, layout: true },
   { path: "/service-providers/:id", component: ServiceProviderDetails, protected: true, layout: true },
   { path: "/provider-applications", component: ProviderApplications, protected: true, layout: true },
@@ -91,20 +78,16 @@ const ROUTES: RouteEntry[] = [
   { path: "/ongoing-services", component: OngoingServices, protected: true, layout: true },
   { path: "/disputes", component: DisputesResolutions, protected: true, layout: true },
   { path: "/disputes-resolutions", component: DisputesResolutions, protected: true, layout: true },
-  { path: "/support", component: Support, protected: true, layout: true },
+  { path: "/support", component: SupportTickets, protected: true, layout: true },
   { path: "/transactions", component: Transactions, protected: true, layout: true },
   { path: "/finance", component: Finance, protected: true, layout: true },
   { path: "/provider-earnings", component: ProviderEarnings, protected: true, layout: true },
   { path: "/payouts", component: PayoutRequests, protected: true, layout: true },
   { path: "/payout-requests", component: PayoutRequests, protected: true, layout: true },
-  { path: "/refunds", component: RefundManagement, protected: true, layout: true },
-  { path: "/refund-management", component: RefundManagement, protected: true, layout: true },
   { path: "/failed-payments", component: FailedPayments, protected: true, layout: true },
   { path: "/categories", component: Categories, protected: true, layout: true },
   { path: "/services", component: Services, protected: true, layout: true },
   { path: "/service-areas", component: ServiceAreas, protected: true, layout: true },
-  { path: "/promotions", component: Promotions, protected: true, layout: true },
-  { path: "/broadcasts", component: Broadcasts, protected: true, layout: true },
   { path: "/reports/revenue", component: Revenue, protected: true, layout: true },
   { path: "/reports/booking-analytics", component: BookingAnalytics, protected: true, layout: true },
   { path: "/reports/business", component: BusinessReports, protected: true, layout: true },
@@ -112,12 +95,6 @@ const ROUTES: RouteEntry[] = [
   { path: "/reports/user", component: UserReports, protected: true, layout: true },
   { path: "/reports/performance", component: PerformanceReports, protected: true, layout: true },
   { path: "/reports/compliance", component: ComplianceReports, protected: true, layout: true },
-  { path: "/commission-rules", component: CommissionRules, protected: true, layout: true },
-  { path: "/admin-roles", component: AdminRoles, protected: true, layout: true },
-  { path: "/notification-settings", component: NotificationSettings, protected: true, layout: true },
-  { path: "/security-settings", component: SecuritySettings, protected: true, layout: true },
-  { path: "/audit-trail", component: AuditTrail, protected: true, layout: true },
-  { path: "/integrations", component: Integrations, protected: true, layout: true },
   { path: "/add-new-admin", component: AddNewAdmin, protected: true, layout: true },
 ];
 
