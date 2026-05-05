@@ -3,6 +3,12 @@ import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "../components/ui/dialog";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -19,11 +25,24 @@ import {
 } from "../components/ui/table";
 import { Search, Users, TrendingUp, DollarSign, Package, CheckCircle } from "lucide-react";
 import { useData } from "../../contexts/DataContext";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import type { Customer } from "../../types";
 
 export function Customers() {
-  const { customers, getBookingsByCustomer } = useData();
+  const {
+    customers,
+    isLoadingCustomers,
+    fetchCustomers,
+    fetchCustomerDetails,
+    updateCustomerStatus,
+  } = useData();
   const [searchTerm, setSearchTerm] = useState("");
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  const [isDetailsOpen, setIsDetailsOpen] = useState(false);
+
+  useEffect(() => {
+    void fetchCustomers();
+  }, [fetchCustomers]);
 
   const filteredCustomers = customers.filter((customer) =>
     customer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -58,13 +77,41 @@ export function Customers() {
     },
     {
       title: "Avg. Bookings per Customer",
-      value: (customers.reduce((sum, c) => sum + c.totalBookings, 0) / customers.length).toFixed(1),
+      value: customers.length
+        ? (customers.reduce((sum, c) => sum + c.totalBookings, 0) / customers.length).toFixed(1)
+        : "0.0",
       change: "Engagement rate",
       icon: TrendingUp,
       color: "text-purple-600",
       bgColor: "bg-purple-50",
     },
   ];
+
+  const handleViewCustomer = async (customer: Customer) => {
+    setSelectedCustomer(customer);
+    setIsDetailsOpen(true);
+    const details = await fetchCustomerDetails(customer.id);
+    if (details) {
+      setSelectedCustomer(details);
+    }
+  };
+
+  const handleStatusChange = async (customer: Customer, status: Customer["status"]) => {
+    const result = await updateCustomerStatus(customer.id, status);
+    if (result.success) {
+      alert(`Customer status updated to ${status}.`);
+    }
+  };
+
+  const getStatusBadgeClass = (status: Customer["status"]) => {
+    if (status === "Active") {
+      return "bg-[#DCFCE7] text-[#15803D] border-[#BBF7D0]";
+    }
+    if (status === "Suspended") {
+      return "bg-yellow-100 text-yellow-700 border-yellow-200";
+    }
+    return "bg-red-100 text-red-700 border-red-200";
+  };
 
   return (
     <div className="space-y-6">
@@ -128,12 +175,19 @@ export function Customers() {
                   <TableHead>Total Spent</TableHead>
                   <TableHead>Member Since</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredCustomers.length === 0 ? (
+                {isLoadingCustomers ? (
                   <TableRow>
-                    <TableCell colSpan={9} className="text-center py-8 text-gray-500">
+                    <TableCell colSpan={10} className="text-center py-8 text-gray-500">
+                      Loading customers...
+                    </TableCell>
+                  </TableRow>
+                ) : filteredCustomers.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={10} className="text-center py-8 text-gray-500">
                       No customers found
                     </TableCell>
                   </TableRow>
@@ -175,10 +229,30 @@ export function Customers() {
                         </span>
                       </TableCell>
                       <TableCell>
-                        <Badge className="bg-[#DCFCE7] text-[#15803D] border-[#BBF7D0]">
+                        <Badge className={getStatusBadgeClass(customer.status)}>
                           <CheckCircle className="w-3 h-3 mr-1" />
                           {customer.status}
                         </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <Button variant="outline" size="sm" onClick={() => handleViewCustomer(customer)}>
+                            View
+                          </Button>
+                          <Select
+                            value={customer.status}
+                            onValueChange={(value) => handleStatusChange(customer, value as Customer["status"])}
+                          >
+                            <SelectTrigger className="w-[130px]">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="Active">Active</SelectItem>
+                              <SelectItem value="Inactive">Inactive</SelectItem>
+                              <SelectItem value="Suspended">Suspended</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))
@@ -188,6 +262,50 @@ export function Customers() {
           </div>
         </CardContent>
       </Card>
+
+      <Dialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Customer Details</DialogTitle>
+          </DialogHeader>
+          {selectedCustomer && (
+            <div className="space-y-4 py-2">
+              <div>
+                <p className="text-sm text-gray-500">Name</p>
+                <p className="font-medium text-gray-900">{selectedCustomer.name}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">Email</p>
+                <p className="font-medium text-gray-900">{selectedCustomer.email}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">Phone</p>
+                <p className="font-medium text-gray-900">{selectedCustomer.phone || "-"}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">Location</p>
+                <p className="font-medium text-gray-900">{selectedCustomer.location || "-"}</p>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm text-gray-500">Bookings</p>
+                  <p className="font-medium text-gray-900">{selectedCustomer.totalBookings}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">Total Spent</p>
+                  <p className="font-medium text-gray-900">₱{selectedCustomer.totalSpent.toLocaleString()}</p>
+                </div>
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">Status</p>
+                <Badge className={getStatusBadgeClass(selectedCustomer.status)}>
+                  {selectedCustomer.status}
+                </Badge>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

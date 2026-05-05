@@ -1,8 +1,16 @@
-import { useState, useMemo } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "../components/ui/dialog";
 import {
   Table,
   TableBody,
@@ -26,27 +34,40 @@ import {
   Calendar,
   DollarSign,
   AlertTriangle,
+  Loader2,
 } from "lucide-react";
 import { useData } from "../../contexts/DataContext";
-import type { DisputeStatus } from "../../types";
+import type { Dispute, DisputeStatus } from "../../types";
 
 export function DisputesResolutions() {
-  const { disputes, getCustomerById, getProviderById, bookings } = useData();
+  const { disputes, isLoadingDisputes, fetchDisputes, getCustomerById, getProviderById, updateDisputeStatus } = useData();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [priorityFilter, setPriorityFilter] = useState<string>("all");
+  const [selectedDispute, setSelectedDispute] = useState<Dispute | null>(null);
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+
+  useEffect(() => {
+    void fetchDisputes();
+  }, [fetchDisputes]);
+
+  const getDisputeCustomerName = (dispute: Dispute) =>
+    dispute.customerName || getCustomerById(dispute.customerId)?.name || "N/A";
+
+  const getDisputeProviderName = (dispute: Dispute) =>
+    dispute.providerName || getProviderById(dispute.providerId)?.businessName || "N/A";
 
   const filteredDisputes = useMemo(() => {
     return disputes.filter((dispute) => {
-      const customer = getCustomerById(dispute.customerId);
-      const provider = getProviderById(dispute.providerId);
-
       const matchesSearch =
         dispute.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        customer?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        provider?.businessName.toLowerCase().includes(searchTerm.toLowerCase());
+        getDisputeCustomerName(dispute).toLowerCase().includes(searchTerm.toLowerCase()) ||
+        getDisputeProviderName(dispute).toLowerCase().includes(searchTerm.toLowerCase());
 
-      const matchesStatus = statusFilter === "all" || dispute.status === statusFilter;
+      const matchesStatus =
+        statusFilter === "all" ||
+        dispute.status === statusFilter ||
+        (statusFilter === "Investigating" && dispute.status === "Under Review");
       const matchesPriority = priorityFilter === "all" || dispute.priority === priorityFilter;
 
       return matchesSearch && matchesStatus && matchesPriority;
@@ -57,7 +78,7 @@ export function DisputesResolutions() {
     return {
       total: disputes.length,
       open: disputes.filter((d) => d.status === "Open").length,
-      investigating: disputes.filter((d) => d.status === "Investigating").length,
+      investigating: disputes.filter((d) => d.status === "Investigating" || d.status === "Under Review").length,
       resolved: disputes.filter((d) => d.status === "Resolved").length,
     };
   }, [disputes]);
@@ -72,6 +93,7 @@ export function DisputesResolutions() {
           </Badge>
         );
       case "Investigating":
+      case "Under Review":
         return (
           <Badge className="bg-blue-100 text-blue-700 border-blue-200">
             <AlertTriangle className="w-3 h-3 mr-1" />
@@ -93,7 +115,7 @@ export function DisputesResolutions() {
           </Badge>
         );
       default:
-        return null;
+        return <Badge variant="outline">{status}</Badge>;
     }
   };
 
@@ -106,8 +128,29 @@ export function DisputesResolutions() {
       case "Low":
         return <Badge className="bg-gray-100 text-gray-700 border-gray-200">Low</Badge>;
       default:
-        return null;
+        return <Badge variant="outline">{priority}</Badge>;
     }
+  };
+
+  const handleUpdateDisputeStatus = async (status: DisputeStatus) => {
+    if (!selectedDispute) {
+      return;
+    }
+
+    setIsUpdatingStatus(true);
+    const result = await updateDisputeStatus(selectedDispute.id, status);
+    if (result.success) {
+      setSelectedDispute((prev) =>
+        prev
+          ? {
+              ...prev,
+              status,
+              resolvedAt: status === "Resolved" ? new Date().toISOString() : prev.resolvedAt,
+            }
+          : prev
+      );
+    }
+    setIsUpdatingStatus(false);
   };
 
   return (
@@ -239,7 +282,16 @@ export function DisputesResolutions() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredDisputes.length === 0 ? (
+                {isLoadingDisputes ? (
+                  <TableRow>
+                    <TableCell colSpan={9} className="text-center py-8 text-gray-500">
+                      <div className="flex items-center justify-center gap-2">
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Loading disputes...
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ) : filteredDisputes.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={9} className="text-center py-8 text-gray-500">
                       No disputes found
@@ -247,9 +299,6 @@ export function DisputesResolutions() {
                   </TableRow>
                 ) : (
                   filteredDisputes.map((dispute) => {
-                    const customer = getCustomerById(dispute.customerId);
-                    const provider = getProviderById(dispute.providerId);
-
                     return (
                       <TableRow key={dispute.id}>
                         <TableCell>
@@ -259,12 +308,12 @@ export function DisputesResolutions() {
                         </TableCell>
                         <TableCell>
                           <span className="text-sm font-medium text-gray-900">
-                            {customer?.name || "N/A"}
+                            {getDisputeCustomerName(dispute)}
                           </span>
                         </TableCell>
                         <TableCell>
                           <span className="text-sm text-gray-600">
-                            {provider?.businessName || "N/A"}
+                            {getDisputeProviderName(dispute)}
                           </span>
                         </TableCell>
                         <TableCell>
@@ -287,7 +336,7 @@ export function DisputesResolutions() {
                         <TableCell>{getStatusBadge(dispute.status)}</TableCell>
                         <TableCell>{getPriorityBadge(dispute.priority)}</TableCell>
                         <TableCell>
-                          <Button size="sm" variant="outline">
+                          <Button size="sm" variant="outline" onClick={() => setSelectedDispute(dispute)}>
                             View Details
                           </Button>
                         </TableCell>
@@ -300,6 +349,87 @@ export function DisputesResolutions() {
           </div>
         </CardContent>
       </Card>
+
+      <Dialog open={selectedDispute !== null} onOpenChange={(open) => !open && setSelectedDispute(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Dispute Details</DialogTitle>
+            <DialogDescription>
+              {selectedDispute?.id} {selectedDispute?.bookingId ? `for booking ${selectedDispute.bookingId}` : ""}
+            </DialogDescription>
+          </DialogHeader>
+
+          {selectedDispute && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <p className="text-gray-500">Customer</p>
+                  <p className="font-medium text-gray-900">{getDisputeCustomerName(selectedDispute)}</p>
+                </div>
+                <div>
+                  <p className="text-gray-500">Provider</p>
+                  <p className="font-medium text-gray-900">{getDisputeProviderName(selectedDispute)}</p>
+                </div>
+                <div>
+                  <p className="text-gray-500">Amount</p>
+                  <p className="font-medium text-gray-900">₱{selectedDispute.amount.toLocaleString()}</p>
+                </div>
+                <div>
+                  <p className="text-gray-500">Filed</p>
+                  <p className="font-medium text-gray-900">
+                    {new Date(selectedDispute.createdAt).toLocaleDateString("en-US", {
+                      month: "short",
+                      day: "numeric",
+                      year: "numeric",
+                    })}
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  {getStatusBadge(selectedDispute.status)}
+                  {getPriorityBadge(selectedDispute.priority)}
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-700">Reason</p>
+                  <p className="text-sm text-gray-600">{selectedDispute.reason}</p>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-700">Description</p>
+                  <p className="text-sm text-gray-600">{selectedDispute.description || "No description provided."}</p>
+                </div>
+                {selectedDispute.resolution && (
+                  <div>
+                    <p className="text-sm font-medium text-gray-700">Resolution</p>
+                    <p className="text-sm text-gray-600">{selectedDispute.resolution}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setSelectedDispute(null)}>
+              Close
+            </Button>
+            <Button
+              variant="outline"
+              disabled={isUpdatingStatus || selectedDispute?.status === "Investigating" || selectedDispute?.status === "Under Review"}
+              onClick={() => handleUpdateDisputeStatus("Investigating")}
+            >
+              {isUpdatingStatus ? "Updating..." : "Mark Under Review"}
+            </Button>
+            <Button
+              className="bg-[#16A34A] hover:bg-[#15803D]"
+              disabled={isUpdatingStatus || selectedDispute?.status === "Resolved"}
+              onClick={() => handleUpdateDisputeStatus("Resolved")}
+            >
+              {isUpdatingStatus ? "Updating..." : "Resolve"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

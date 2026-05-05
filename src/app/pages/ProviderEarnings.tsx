@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
@@ -19,6 +19,13 @@ import {
   SelectValue,
 } from "../components/ui/select";
 import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "../components/ui/dialog";
+import {
   DollarSign,
   TrendingUp,
   Clock,
@@ -28,36 +35,46 @@ import {
   Eye,
 } from "lucide-react";
 import { useData } from "../../contexts/DataContext";
+import type { ProviderEarning } from "../../types";
 
 export function ProviderEarnings() {
-  const { serviceProviders, calculateProviderEarnings, getCategoryById, getBookingsByProvider } = useData();
+  const { providerEarnings, isLoadingProviderEarnings, fetchProviderEarnings } = useData();
   const [searchTerm, setSearchTerm] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  const [selectedProvider, setSelectedProvider] = useState<ProviderEarning | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
+  useEffect(() => {
+    fetchProviderEarnings();
+  }, [fetchProviderEarnings]);
 
   const providerEarningsData = useMemo(() => {
-    return serviceProviders.map((provider) => {
-      const earnings = calculateProviderEarnings(provider.id);
-      const category = getCategoryById(provider.categoryId);
-      const bookings = getBookingsByProvider(provider.id);
-      const completedBookings = bookings.filter((b) => b.status === "Completed");
+    return providerEarnings.map((earnings) => ({
+      earnings,
+      category: earnings.categoryName || "N/A",
+      completedBookingsCount: earnings.completedBookings || earnings.totalBookings,
+    }));
+  }, [providerEarnings]);
 
-      return {
-        provider,
-        earnings,
-        category: category?.name || "N/A",
-        completedBookingsCount: completedBookings.length,
-      };
-    });
-  }, [serviceProviders, calculateProviderEarnings, getCategoryById, getBookingsByProvider]);
+  const categoryOptions = useMemo(() => {
+    const categories = providerEarningsData
+      .map((item) => ({
+        id: item.earnings.categoryId || item.category,
+        name: item.category,
+      }))
+      .filter((category) => category.id && category.name && category.name !== "N/A");
+
+    return Array.from(new Map(categories.map((category) => [category.id, category])).values());
+  }, [providerEarningsData]);
 
   const filteredProviders = useMemo(() => {
     return providerEarningsData.filter((item) => {
       const matchesSearch =
-        item.provider.businessName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.provider.id.toLowerCase().includes(searchTerm.toLowerCase());
+        (item.earnings.providerName || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+        item.earnings.providerId.toLowerCase().includes(searchTerm.toLowerCase());
 
       const matchesCategory =
-        categoryFilter === "all" || item.provider.categoryId === categoryFilter;
+        categoryFilter === "all" || item.earnings.categoryId === categoryFilter || item.category === categoryFilter;
 
       return matchesSearch && matchesCategory;
     });
@@ -188,19 +205,21 @@ export function ProviderEarnings() {
             </div>
 
             {/* Category Filter */}
-            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+            <Select
+              value={categoryFilter}
+              onValueChange={setCategoryFilter}
+              disabled={categoryOptions.length === 0}
+            >
               <SelectTrigger>
                 <SelectValue placeholder="Filter by Category" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Categories</SelectItem>
-                <SelectItem value="CAT-001">Home Maintenance & Repair</SelectItem>
-                <SelectItem value="CAT-002">Beauty, Wellness & Personal Care</SelectItem>
-                <SelectItem value="CAT-003">Domestic & Cleaning Services</SelectItem>
-                <SelectItem value="CAT-004">Pet Services</SelectItem>
-                <SelectItem value="CAT-005">Events & Entertainment</SelectItem>
-                <SelectItem value="CAT-006">Automotive & Tech Support</SelectItem>
-                <SelectItem value="CAT-007">Education & Professional Services</SelectItem>
+                {categoryOptions.map((category) => (
+                  <SelectItem key={category.id} value={category.id}>
+                    {category.name}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -222,24 +241,30 @@ export function ProviderEarnings() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredProviders.length === 0 ? (
+                {isLoadingProviderEarnings ? (
+                  <TableRow>
+                    <TableCell colSpan={9} className="text-center py-8 text-gray-500">
+                      Loading provider earnings...
+                    </TableCell>
+                  </TableRow>
+                ) : filteredProviders.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={9} className="text-center py-8 text-gray-500">
                       No providers found
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredProviders.map(({ provider, earnings, category, completedBookingsCount }) => (
-                    <TableRow key={provider.id}>
+                  filteredProviders.map(({ earnings, category, completedBookingsCount }) => (
+                    <TableRow key={earnings.providerId}>
                       <TableCell>
                         <span className="font-mono font-semibold text-[#16A34A]">
-                          {provider.id}
+                          {earnings.providerId}
                         </span>
                       </TableCell>
                       <TableCell>
                         <div>
-                          <p className="font-medium text-gray-900">{provider.businessName}</p>
-                          <p className="text-xs text-gray-500">{provider.contactPerson}</p>
+                          <p className="font-medium text-gray-900">{earnings.providerName || "N/A"}</p>
+                          <p className="text-xs text-gray-500">{earnings.providerEmail || earnings.providerId}</p>
                         </div>
                       </TableCell>
                       <TableCell>
@@ -279,7 +304,14 @@ export function ProviderEarnings() {
                         )}
                       </TableCell>
                       <TableCell>
-                        <Button size="sm" variant="outline">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            setSelectedProvider(earnings);
+                            setIsModalOpen(true);
+                          }}
+                        >
                           <Eye className="w-3 h-3 mr-1" />
                           View Details
                         </Button>
@@ -292,6 +324,98 @@ export function ProviderEarnings() {
           </div>
         </CardContent>
       </Card>
+
+      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Provider Earnings Details</DialogTitle>
+          </DialogHeader>
+
+          {selectedProvider && (
+            <div className="space-y-4 py-2">
+              <div>
+                <p className="text-sm text-gray-500">Provider Name</p>
+                <p className="font-semibold text-gray-900">
+                  {selectedProvider.providerName || "N/A"}
+                </p>
+              </div>
+
+              <div>
+                <p className="text-sm text-gray-500">Provider Email</p>
+                <p className="font-medium text-gray-900">
+                  {selectedProvider.providerEmail || "N/A"}
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm text-gray-500">Total Earnings</p>
+                  <p className="font-semibold text-gray-900">
+                    ₱{selectedProvider.totalEarnings.toLocaleString()}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">Pending Earnings</p>
+                  <p className="font-semibold text-yellow-600">
+                    ₱{selectedProvider.pendingEarnings.toLocaleString()}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">Paid Earnings</p>
+                  <p className="font-semibold text-[#16A34A]">
+                    ₱{selectedProvider.paidEarnings.toLocaleString()}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">Total Bookings</p>
+                  <p className="font-semibold text-gray-900">
+                    {selectedProvider.totalBookings.toLocaleString()}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">Completed Bookings</p>
+                  <p className="font-semibold text-gray-900">
+                    {selectedProvider.completedBookings.toLocaleString()}
+                  </p>
+                </div>
+                {selectedProvider.totalCommission != null && (
+                  <div>
+                    <p className="text-sm text-gray-500">Commission</p>
+                    <p className="font-semibold text-gray-900">
+                      ₱{selectedProvider.totalCommission.toLocaleString()}
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <p className="text-sm text-gray-500">Last Payout</p>
+                <p className="font-medium text-gray-900">
+                  {selectedProvider.lastPayoutDate
+                    ? new Date(selectedProvider.lastPayoutDate).toLocaleDateString("en-US", {
+                        month: "short",
+                        day: "numeric",
+                        year: "numeric",
+                      })
+                    : "No payout yet"}
+                </p>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsModalOpen(false);
+                setSelectedProvider(null);
+              }}
+            >
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

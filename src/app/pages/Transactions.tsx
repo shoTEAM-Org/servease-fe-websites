@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
@@ -41,11 +41,15 @@ import type { PaymentStatus } from "../../types";
 type TransactionTab = "all" | "earnings" | "failed";
 
 export function Transactions() {
-  const { transactions, getCustomerById, getProviderById, getCategoryById, serviceProviders, calculateProviderEarnings } = useData();
+  const { transactions, isLoadingTransactions, fetchTransactions, getCustomerById, getProviderById, getCategoryById, serviceProviders, calculateProviderEarnings } = useData();
   const [activeTab, setActiveTab] = useState<TransactionTab>("all");
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [paymentMethodFilter, setPaymentMethodFilter] = useState<string>("all");
+
+  useEffect(() => {
+    fetchTransactions();
+  }, [fetchTransactions]);
 
   const filteredTransactions = useMemo(() => {
     return transactions.filter((transaction) => {
@@ -264,7 +268,13 @@ export function Transactions() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredTransactions.length === 0 ? (
+                {isLoadingTransactions ? (
+                  <TableRow>
+                    <TableCell colSpan={11} className="text-center py-8 text-gray-500">
+                      Loading transactions...
+                    </TableCell>
+                  </TableRow>
+                ) : filteredTransactions.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={11} className="text-center py-8 text-gray-500">
                       No transactions found

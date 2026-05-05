@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useNavigate } from "react-router";
+import { useEffect, useState } from "react";
+import { useLocation, useNavigate } from "react-router";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
@@ -20,6 +20,7 @@ import {
   CheckCircle,
   XCircle,
   AlertCircle,
+  Loader2,
 } from "lucide-react";
 import {
   Select,
@@ -180,13 +181,121 @@ const stats = [
   },
 ];
 
+type ProviderApplicationRow = typeof applications[number];
+
+function getApiBaseUrl(): string {
+  return import.meta.env.VITE_API_BASE_URL || "";
+}
+
+function getAuthHeaders(): Record<string, string> {
+  const token = localStorage.getItem("servease_admin_token");
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" ? value as Record<string, unknown> : {};
+}
+
+function getString(...values: unknown[]): string | undefined {
+  for (const value of values) {
+    if (typeof value === "string" && value) {
+      return value;
+    }
+    if (typeof value === "number") {
+      return String(value);
+    }
+  }
+  return undefined;
+}
+
+function getApplicationArray(response: unknown): unknown[] {
+  const record = asRecord(response);
+  if (Array.isArray(response)) return response;
+  if (Array.isArray(record.data)) return record.data;
+  if (Array.isArray(record.applications)) return record.applications;
+  if (Array.isArray(record.provider_applications)) return record.provider_applications;
+  return [];
+}
+
+function normalizeApplicationRow(application: unknown): ProviderApplicationRow | null {
+  const record = asRecord(application);
+  const provider = asRecord(record.provider);
+  const business = asRecord(record.business);
+  const owner = asRecord(record.owner);
+  const address = asRecord(record.address ?? record.business_address);
+  const id = getString(record.applicationId, record.application_id, record.id);
+  const businessName = getString(record.businessName, record.business_name, business.name, provider.businessName, provider.business_name);
+  const ownerName = getString(record.ownerName, record.owner_name, owner.name, provider.ownerName, provider.owner_name, provider.contactPerson, provider.contact_person);
+
+  if (!id || !businessName) {
+    return null;
+  }
+
+  return {
+    applicationId: id,
+    businessName,
+    ownerName: ownerName || "Unknown Owner",
+    category: getString(record.category, record.categoryName, record.category_name, provider.category, provider.categoryName, provider.category_name) || "Uncategorized",
+    dateApplied: getString(record.dateApplied, record.date_applied, record.createdAt, record.created_at, record.submittedAt, record.submitted_at) || new Date().toISOString(),
+    location: getString(record.location, address.city, business.location, provider.location) || "N/A",
+    status: (getString(record.status, record.application_status, record.approvalStatus, record.approval_status) || "pending").toLowerCase(),
+    providerId: getString(record.providerId, record.provider_id, provider.id) || id,
+  };
+}
+
+function normalizeApplicationRows(response: unknown): ProviderApplicationRow[] {
+  return getApplicationArray(response)
+    .map(normalizeApplicationRow)
+    .filter((application): application is ProviderApplicationRow => application !== null);
+}
+
 export function ProviderApplications() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const [providerApplications, setProviderApplications] = useState<ProviderApplicationRow[]>([]);
+  const [isLoadingApplications, setIsLoadingApplications] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("pending");
   const [categoryFilter, setCategoryFilter] = useState("all");
 
-  let filteredApplications = applications.filter((app) => {
+  useEffect(() => {
+    const apiBaseUrl = getApiBaseUrl();
+    const applicationsUrl = `${apiBaseUrl}/api/admin/v1/users/provider-applications`;
+
+    setIsLoadingApplications(true);
+    fetch(applicationsUrl, {
+      headers: getAuthHeaders(),
+    })
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error(`Failed to fetch provider applications: ${response.status} ${response.statusText}`);
+        }
+        return response.json();
+      })
+      .then((data) => {
+        const normalizedApplications = normalizeApplicationRows(data);
+        console.log("provider applications raw response", data);
+        console.log(
+          "provider applications normalized statuses",
+          normalizedApplications.map((app) => ({
+            applicationId: app.applicationId,
+            businessName: app.businessName,
+            status: app.status,
+          }))
+        );
+        setProviderApplications(normalizedApplications);
+      })
+      .catch((error) => {
+        console.warn("Provider applications could not be loaded.", error);
+        alert("Provider applications could not be loaded. Please try again.");
+        setProviderApplications([]);
+      })
+      .finally(() => {
+        setIsLoadingApplications(false);
+      });
+  }, [location.state]);
+
+  let filteredApplications = providerApplications.filter((app) => {
     const matchesSearch =
       app.businessName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       app.ownerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -226,7 +335,15 @@ export function ProviderApplications() {
     return <Badge variant="outline">{status}</Badge>;
   };
 
-  const pendingCount = applications.filter((app) => app.status === "pending").length;
+  const pendingCount = providerApplications.filter((app) => app.status === "pending").length;
+  const approvedCount = providerApplications.filter((app) => app.status === "approved").length;
+  const requiresActionCount = providerApplications.filter((app) => app.status === "pending").length;
+  const displayStats = stats.map((stat) => {
+    if (stat.title === "Pending Review") return { ...stat, value: String(pendingCount) };
+    if (stat.title === "Approved Today") return { ...stat, value: String(approvedCount) };
+    if (stat.title === "Requires Action") return { ...stat, value: String(requiresActionCount) };
+    return stat;
+  });
 
   return (
     <div className="space-y-6">
@@ -239,7 +356,7 @@ export function ProviderApplications() {
 
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {stats.map((stat) => (
+        {displayStats.map((stat) => (
           <Card key={stat.title}>
             <CardContent className="p-6">
               <div className="flex items-center gap-4">
@@ -264,7 +381,7 @@ export function ProviderApplications() {
             <CardTitle>Application Queue</CardTitle>
             <div className="flex items-center gap-2 text-sm text-gray-500">
               <Filter className="w-4 h-4" />
-              {filteredApplications.length} of {applications.length} applications
+              {filteredApplications.length} of {providerApplications.length} applications
             </div>
           </div>
         </CardHeader>
@@ -341,7 +458,16 @@ export function ProviderApplications() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredApplications.length === 0 ? (
+                {isLoadingApplications ? (
+                  <TableRow>
+                    <TableCell colSpan={8} className="text-center py-8 text-gray-500">
+                      <div className="inline-flex items-center gap-2">
+                        <Loader2 className="w-4 h-4 animate-spin text-[#00BF63]" />
+                        Loading provider applications...
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ) : filteredApplications.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={8} className="text-center py-8 text-gray-500">
                       No applications found matching your filters

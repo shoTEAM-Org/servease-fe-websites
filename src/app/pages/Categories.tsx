@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
@@ -52,7 +52,14 @@ import {
 import { useData } from "../../contexts/DataContext";
 
 export function Categories() {
-  const { serviceCategories } = useData();
+  const {
+    serviceCategories,
+    createServiceCategory,
+    updateServiceCategory,
+    deleteServiceCategory,
+    toggleServiceCategoryStatus,
+    fetchServiceCategories,
+  } = useData();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -66,18 +73,36 @@ export function Categories() {
     sortOrder: "",
   });
 
+  const getCategoryStatus = (category: any) => category.status || "Active";
+  const isCategoryActive = (category: any) => getCategoryStatus(category).toLowerCase() !== "inactive";
+  const getCategoryErrorMessage = (
+    result: { status?: number; error?: string },
+    fallback: string
+  ) => {
+    if (result.status === 401) {
+      return "Admin login is required before managing categories.";
+    }
+    return result.error || fallback;
+  };
+
   // Filter categories
   const filteredCategories = serviceCategories.filter((category) => {
     const matchesSearch = category.name.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = statusFilter === "all" || category.name; // All are active in current data
+    const status = getCategoryStatus(category).toLowerCase();
+    const matchesStatus = statusFilter === "all" || status === statusFilter;
     return matchesSearch && matchesStatus;
   });
 
+  useEffect(() => {
+    void fetchServiceCategories();
+  }, [fetchServiceCategories]);
+
   // Calculate stats
+  const activeCount = serviceCategories.filter(isCategoryActive).length;
   const stats = {
     total: serviceCategories.length,
-    active: serviceCategories.length,
-    inactive: 0,
+    active: activeCount,
+    inactive: serviceCategories.length - activeCount,
     withSubcategories: 0,
   };
 
@@ -91,16 +116,33 @@ export function Categories() {
     setSelectedCategory(category);
     setFormData({
       name: category.name,
-      icon: category.id,
-      description: "",
-      status: "Active",
-      sortOrder: "",
+      icon: category.icon || "",
+      description: category.description || "",
+      status: getCategoryStatus(category),
+      sortOrder: category.sortOrder == null ? "" : String(category.sortOrder),
     });
     setIsDialogOpen(true);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
+    console.log("handleSave clicked");
+    console.log("selectedCategory", selectedCategory);
+    console.log("formData", formData);
     console.log("Saving category:", formData);
+    const result = selectedCategory
+      ? await updateServiceCategory(selectedCategory.id, formData)
+      : await createServiceCategory(formData);
+    console.log("result from createServiceCategory", result);
+
+    if (!result.success) {
+      alert(
+        getCategoryErrorMessage(
+          result,
+          selectedCategory ? "Category could not be updated." : "Category could not be created."
+        )
+      );
+      return;
+    }
     alert(`✅ Category ${selectedCategory ? "updated" : "created"} successfully!`);
     setIsDialogOpen(false);
   };
@@ -110,15 +152,32 @@ export function Categories() {
     setDeleteDialogOpen(true);
   };
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     console.log("Deleting category:", selectedCategory);
+    if (!selectedCategory) {
+      return;
+    }
+
+    const result = await deleteServiceCategory(selectedCategory.id);
+    if (!result.success) {
+      alert(getCategoryErrorMessage(result, "Category could not be deleted."));
+      return;
+    }
+
     alert(`✅ Category "${selectedCategory?.name}" deleted successfully!`);
     setDeleteDialogOpen(false);
     setSelectedCategory(null);
   };
 
-  const toggleStatus = (category: any) => {
+  const toggleStatus = async (category: any) => {
     console.log("Toggling status for:", category.name);
+    const nextStatus = isCategoryActive(category) ? "Inactive" : "Active";
+    const result = await toggleServiceCategoryStatus(category.id, nextStatus);
+    if (!result.success) {
+      alert(getCategoryErrorMessage(result, "Category status could not be updated."));
+      return;
+    }
+
     alert(`✅ Category "${category.name}" status toggled!`);
   };
 
@@ -241,7 +300,11 @@ export function Categories() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredCategories.map((category, index) => (
+                {filteredCategories.map((category, index) => {
+                  const active = isCategoryActive(category);
+                  const status = getCategoryStatus(category);
+
+                  return (
                   <TableRow key={category.id}>
                     <TableCell>
                       <GripVertical className="w-5 h-5 text-gray-400 cursor-move" />
@@ -263,14 +326,28 @@ export function Categories() {
                         Icon
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-right text-gray-600">-</TableCell>
+                    <TableCell className="text-right text-gray-600">
+                      {category.servicesCount ?? "-"}
+                    </TableCell>
                     <TableCell>
-                      <Badge className="bg-[#DCFCE7] text-[#15803D] border-[#BBF7D0]">
-                        <CheckCircle className="w-3 h-3 mr-1" />
-                        Active
+                      <Badge
+                        className={
+                          active
+                            ? "bg-[#DCFCE7] text-[#15803D] border-[#BBF7D0]"
+                            : "bg-red-50 text-red-700 border-red-200"
+                        }
+                      >
+                        {active ? (
+                          <CheckCircle className="w-3 h-3 mr-1" />
+                        ) : (
+                          <XCircle className="w-3 h-3 mr-1" />
+                        )}
+                        {status}
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-right text-gray-600">{index + 1}</TableCell>
+                    <TableCell className="text-right text-gray-600">
+                      {category.sortOrder ?? index + 1}
+                    </TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-2">
                         <Button variant="outline" size="sm" onClick={() => handleEdit(category)}>
@@ -281,7 +358,7 @@ export function Categories() {
                           size="sm"
                           onClick={() => toggleStatus(category)}
                         >
-                          <Eye className="w-4 h-4" />
+                          {active ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
                         </Button>
                         <Button
                           variant="outline"
@@ -294,7 +371,8 @@ export function Categories() {
                       </div>
                     </TableCell>
                   </TableRow>
-                ))}
+                  );
+                })}
               </TableBody>
             </Table>
           </div>

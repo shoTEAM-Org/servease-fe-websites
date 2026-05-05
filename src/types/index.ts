@@ -4,7 +4,7 @@ export type BookingStatus = "Pending" | "Confirmed" | "In Progress" | "Completed
 export type PaymentStatus = "Pending" | "Paid" | "Refunded" | "Failed";
 export type PaymentMethod = "Credit Card" | "Debit Card";
 export type ProviderStatus = "Active" | "Inactive" | "Suspended";
-export type DisputeStatus = "Open" | "Under Review" | "Resolved" | "Escalated";
+export type DisputeStatus = "Open" | "Under Review" | "Investigating" | "Resolved" | "Escalated" | "Closed";
 export type PayoutStatus = "Pending" | "Approved" | "Released" | "Rejected";
 
 export interface Customer {
@@ -16,19 +16,43 @@ export interface Customer {
   memberSince: string;
   totalBookings: number;
   totalSpent: number;
-  status: "Active" | "Inactive";
+  status: "Active" | "Inactive" | "Suspended";
 }
 
 export interface ServiceCategory {
   id: string;
   name: string;
   commissionRate: number;
+  icon?: string;
+  description?: string;
+  status?: "Active" | "Inactive" | string;
+  sortOrder?: number;
+  servicesCount?: number;
+}
+
+export interface MarketplaceService {
+  id: string;
+  providerId: string;
+  name: string;
+  description?: string;
+  categoryId: string;
+  category: string;
+  pricingType: "Fixed" | "Hourly" | "Starting at" | string;
+  basePrice: number;
+  hourlyRate?: number;
+  flatRate?: number;
+  isActive: boolean;
+  status: "Active" | "Inactive" | string;
+  lastUpdated: string;
+  duration: string;
+  serviceLocationType?: string;
 }
 
 export interface ServiceProvider {
   id: string;
   businessName: string;
   categoryId: string;
+  categoryName?: string;
   contactPerson: string;
   email: string;
   phone: string;
@@ -47,8 +71,12 @@ export interface ServiceProvider {
 export interface Booking {
   id: string;
   customerId: string;
+  customerName?: string;
+  customerEmail?: string;
   providerId: string;
+  providerName?: string;
   categoryId: string;
+  categoryName?: string;
   serviceDescription: string;
   scheduledDate: string;
   completedDate?: string;
@@ -77,7 +105,12 @@ export interface Transaction {
 
 export interface ProviderEarning {
   providerId: string;
+  providerName?: string;
+  providerEmail?: string;
+  categoryId?: string;
+  categoryName?: string;
   totalEarnings: number;
+  totalCommission?: number;
   pendingEarnings: number;
   paidEarnings: number;
   totalBookings: number;
@@ -88,6 +121,8 @@ export interface ProviderEarning {
 export interface PayoutRequest {
   id: string;
   providerId: string;
+  providerName?: string;
+  providerEmail?: string;
   amount: number;
   status: PayoutStatus;
   requestedDate: string;
@@ -103,11 +138,14 @@ export interface Dispute {
   id: string;
   bookingId: string;
   customerId: string;
+  customerName?: string;
   providerId: string;
+  providerName?: string;
   reason: string;
   description: string;
   amount: number;
   status: DisputeStatus;
+  priority?: "High" | "Medium" | "Low" | string;
   createdAt: string;
   resolvedAt?: string;
   resolution?: string;
@@ -118,6 +156,8 @@ export interface Refund {
   id: string;
   bookingId: string;
   customerId: string;
+  customerName?: string;
+  customerEmail?: string;
   amount: number;
   reason: string;
   status: "Pending" | "Approved" | "Rejected" | "Processed";

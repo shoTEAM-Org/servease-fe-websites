@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
@@ -41,12 +41,25 @@ import { useData } from "../../contexts/DataContext";
 import type { PayoutStatus } from "../../types";
 
 export function PayoutRequests() {
-  const { payoutRequests, getProviderById, approvePayoutRequest, calculateProviderEarnings } = useData();
+  const {
+    payoutRequests,
+    isLoadingPayoutRequests,
+    fetchPayoutRequests,
+    getProviderById,
+    approvePayoutRequest,
+    updatePayoutRequestStatus,
+    calculateProviderEarnings,
+  } = useData();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [selectedPayout, setSelectedPayout] = useState<string | null>(null);
   const [showApproveDialog, setShowApproveDialog] = useState(false);
   const [showRejectDialog, setShowRejectDialog] = useState(false);
+  const [rejectReason, setRejectReason] = useState("");
+
+  useEffect(() => {
+    fetchPayoutRequests();
+  }, [fetchPayoutRequests]);
 
   const filteredPayouts = useMemo(() => {
     return payoutRequests.filter((payout) => {
@@ -54,6 +67,8 @@ export function PayoutRequests() {
       
       const matchesSearch =
         payout.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        payout.providerName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        payout.providerId.toLowerCase().includes(searchTerm.toLowerCase()) ||
         provider?.businessName.toLowerCase().includes(searchTerm.toLowerCase()) ||
         provider?.id.toLowerCase().includes(searchTerm.toLowerCase());
 
@@ -82,12 +97,29 @@ export function PayoutRequests() {
     };
   }, [payoutRequests]);
 
-  const handleApprove = () => {
+  const handleApprove = async () => {
     if (selectedPayout) {
-      approvePayoutRequest(selectedPayout);
-      setShowApproveDialog(false);
-      setSelectedPayout(null);
+      const result = await approvePayoutRequest(selectedPayout);
+      if (result.success) {
+        setShowApproveDialog(false);
+        setSelectedPayout(null);
+      }
     }
+  };
+
+  const handleReject = async () => {
+    if (selectedPayout) {
+      const result = await updatePayoutRequestStatus(selectedPayout, "Rejected");
+      if (result.success) {
+        setShowRejectDialog(false);
+        setSelectedPayout(null);
+        setRejectReason("");
+      }
+    }
+  };
+
+  const handleRelease = async (payoutId: string) => {
+    await updatePayoutRequestStatus(payoutId, "Released");
   };
 
   const getStatusBadge = (status: PayoutStatus) => {
@@ -250,7 +282,13 @@ export function PayoutRequests() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredPayouts.length === 0 ? (
+                {isLoadingPayoutRequests ? (
+                  <TableRow>
+                    <TableCell colSpan={8} className="text-center py-8 text-gray-500">
+                      Loading payout requests...
+                    </TableCell>
+                  </TableRow>
+                ) : filteredPayouts.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={8} className="text-center py-8 text-gray-500">
                       No payout requests found
@@ -271,7 +309,7 @@ export function PayoutRequests() {
                         <TableCell>
                           <div>
                             <p className="font-medium text-gray-900">
-                              {provider?.businessName || "N/A"}
+                              {provider?.businessName || payout.providerName || "N/A"}
                             </p>
                             <p className="text-xs text-gray-500">
                               Available: ₱{earnings.pendingEarnings.toLocaleString()}
@@ -280,7 +318,7 @@ export function PayoutRequests() {
                         </TableCell>
                         <TableCell>
                           <span className="font-mono text-sm text-gray-600">
-                            {provider?.id || "N/A"}
+                            {provider?.id || payout.providerId || "N/A"}
                           </span>
                         </TableCell>
                         <TableCell>
@@ -291,11 +329,13 @@ export function PayoutRequests() {
                         <TableCell>
                           <div>
                             <p className="text-sm font-medium text-gray-900">
-                              {payout.bankDetails.accountName}
+                              {payout.bankDetails.accountName || "N/A"}
                             </p>
                             <p className="text-xs text-gray-500">
-                              {payout.bankDetails.bankName} - ****
-                              {payout.bankDetails.accountNumber.slice(-4)}
+                              {payout.bankDetails.bankName || "N/A"}
+                              {payout.bankDetails.accountNumber
+                                ? ` - ****${payout.bankDetails.accountNumber.slice(-4)}`
+                                : ""}
                             </p>
                           </div>
                         </TableCell>
@@ -336,6 +376,16 @@ export function PayoutRequests() {
                                 Reject
                               </Button>
                             </div>
+                          )}
+                          {payout.status === "Approved" && (
+                            <Button
+                              size="sm"
+                              onClick={() => handleRelease(payout.id)}
+                              className="bg-[#16A34A] hover:bg-[#15803D]"
+                            >
+                              <Wallet className="w-3 h-3 mr-1" />
+                              Release
+                            </Button>
                           )}
                         </TableCell>
                       </TableRow>
@@ -385,7 +435,11 @@ export function PayoutRequests() {
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">
-            <Input placeholder="Reason for rejection..." />
+            <Input
+              placeholder="Reason for rejection..."
+              value={rejectReason}
+              onChange={(event) => setRejectReason(event.target.value)}
+            />
           </div>
           <DialogFooter>
             <Button
@@ -398,10 +452,7 @@ export function PayoutRequests() {
               Cancel
             </Button>
             <Button
-              onClick={() => {
-                setShowRejectDialog(false);
-                setSelectedPayout(null);
-              }}
+              onClick={handleReject}
               className="bg-red-600 hover:bg-red-700"
             >
               Reject Request

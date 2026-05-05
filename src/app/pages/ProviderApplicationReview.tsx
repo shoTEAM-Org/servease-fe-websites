@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate, useParams } from "react-router";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
@@ -203,6 +203,142 @@ const DOCUMENT_TYPES = [
   { id: "insurance", name: "Insurance Certificate", file: "insurance-cert-2026.pdf", date: "Mar 1, 2026", status: "pending", color: "bg-indigo-100", iconColor: "text-indigo-500" },
 ];
 
+type ProviderApplicationDetail = ReturnType<typeof buildApplication>;
+type ApplicationDocument = typeof DOCUMENT_TYPES[number];
+
+function getApiBaseUrl(): string {
+  return import.meta.env.VITE_API_BASE_URL || "";
+}
+
+function getAuthHeaders(): Record<string, string> {
+  const token = localStorage.getItem("servease_admin_token");
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" ? value as Record<string, unknown> : {};
+}
+
+function getString(...values: unknown[]): string | undefined {
+  for (const value of values) {
+    if (typeof value === "string" && value) return value;
+    if (typeof value === "number") return String(value);
+  }
+  return undefined;
+}
+
+function getDetailRecord(response: unknown): Record<string, unknown> {
+  const root = asRecord(response);
+  return asRecord(root.data && typeof root.data === "object" ? root.data : response);
+}
+
+function normalizeDetail(response: unknown, fallbackId: string, fallback?: ProviderApplicationDetail | null): ProviderApplicationDetail {
+  const record = getDetailRecord(response);
+  const provider = asRecord(record.provider);
+  const business = asRecord(record.business);
+  const owner = asRecord(record.owner);
+  const address = asRecord(record.businessAddress ?? record.business_address ?? record.address);
+
+  const applicationId = getString(record.applicationId, record.application_id, record.id) || fallback?.applicationId || fallbackId;
+  const businessName = getString(record.businessName, record.business_name, business.name, provider.businessName, provider.business_name) || fallback?.businessName || "Provider Application";
+  const ownerName = getString(record.ownerName, record.owner_name, owner.name, provider.ownerName, provider.owner_name, provider.contactPerson, provider.contact_person) || fallback?.ownerName || "Unknown Owner";
+  const category = getString(record.category, record.categoryName, record.category_name, provider.category, provider.categoryName, provider.category_name) || fallback?.category || "Uncategorized";
+  const dateApplied = getString(record.dateApplied, record.date_applied, record.createdAt, record.created_at, record.submittedAt, record.submitted_at) || fallback?.dateApplied || "";
+  const city = getString(address.city, business.city, provider.city, record.city, record.location) || fallback?.businessAddress.city || "N/A";
+  const street = getString(address.street, business.street, provider.street) || fallback?.businessAddress.street || "";
+  const barangay = getString(address.barangay, business.barangay, provider.barangay) || fallback?.businessAddress.barangay || "";
+  const riskLevel = getString(record.riskLevel, record.risk_level) as ProviderApplicationDetail["riskLevel"] | undefined;
+  const flags = Array.isArray(record.flags) ? record.flags.map(String) : fallback?.flags || [];
+
+  return {
+    ...(fallback || buildApplication(
+      applicationId,
+      businessName,
+      ownerName,
+      category,
+      dateApplied,
+      city,
+      "low",
+      [],
+      "Company",
+      "",
+      "Physical Location",
+      { street, barangay, city },
+      "",
+      ""
+    )),
+    applicationId,
+    businessName,
+    ownerName,
+    category,
+    dateApplied,
+    location: getString(record.location, city) || city,
+    riskLevel: riskLevel === "medium" || riskLevel === "high" || riskLevel === "low" ? riskLevel : fallback?.riskLevel || "low",
+    flags,
+    govIdNumber: getString(record.govIdNumber, record.gov_id_number, record.governmentIdNumber, record.government_id_number) || fallback?.govIdNumber || "",
+    ocrConfidence: Number(record.ocrConfidence ?? record.ocr_confidence ?? fallback?.ocrConfidence ?? 0),
+    govIdType: getString(record.govIdType, record.gov_id_type, record.governmentIdType, record.government_id_type) || fallback?.govIdType || "PhilSys National ID",
+    providerType: (getString(record.providerType, record.provider_type, provider.providerType, provider.provider_type) as ProviderApplicationDetail["providerType"]) || fallback?.providerType || "Company",
+    businessDescription: getString(record.businessDescription, record.business_description, business.description, provider.businessDescription, provider.business_description) || fallback?.businessDescription || "",
+    businessType: (getString(record.businessType, record.business_type, business.type) as ProviderApplicationDetail["businessType"]) || fallback?.businessType || "Physical Location",
+    businessAddress: { street, barangay, city },
+    contactPhone: getString(record.contactPhone, record.contact_phone, owner.phone, provider.phone) || fallback?.contactPhone || "",
+    contactEmail: getString(record.contactEmail, record.contact_email, owner.email, provider.email) || fallback?.contactEmail || "",
+  };
+}
+
+function normalizeDocuments(response: unknown): ApplicationDocument[] {
+  const record = getDetailRecord(response);
+  const documents = Array.isArray(record.documents)
+    ? record.documents
+    : Array.isArray(record.provider_documents)
+      ? record.provider_documents
+      : [];
+
+  if (documents.length === 0) {
+    return DOCUMENT_TYPES;
+  }
+
+  return documents.map((document, index) => {
+    const doc = asRecord(document);
+    const fallback = DOCUMENT_TYPES[index % DOCUMENT_TYPES.length];
+    return {
+      ...fallback,
+      id: getString(doc.id, doc.document_id, doc.type) || fallback.id,
+      name: getString(doc.name, doc.document_name, doc.type, doc.document_type) || fallback.name,
+      file: getString(doc.file, doc.file_name, doc.filename, doc.url, doc.signed_url) || fallback.file,
+      date: getString(doc.date, doc.uploaded_at, doc.created_at) || fallback.date,
+      status: getString(doc.status, doc.verification_status) || fallback.status,
+    };
+  });
+}
+
+async function patchApplicationStatus(
+  applicationId: string,
+  body: { status: "approved" } | { status: "rejected"; reject_reason: string }
+): Promise<{ success: boolean; error?: string }> {
+  const apiBaseUrl = getApiBaseUrl();
+  const response = await fetch(`${apiBaseUrl}/api/admin/v1/users/provider-applications/${encodeURIComponent(applicationId)}/status`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      ...getAuthHeaders(),
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => null);
+    const record = asRecord(data);
+    return {
+      success: false,
+      error: getString(record.message, record.error) || "Provider application status could not be updated.",
+    };
+  }
+
+  return { success: true };
+}
+
 /* ─── HELPERS ────────────────────────────────────────────────────── */
 type VerifStatus = null | "loading" | "verified" | "no-match" | "error";
 
@@ -256,14 +392,16 @@ function ReadOnlyField({ label, children }: { label: string; children: React.Rea
 export function ProviderApplicationReview() {
   const navigate = useNavigate();
   const { applicationId } = useParams<{ applicationId: string }>();
-  const application = applicationId ? mockApplications[applicationId] : null;
+  const [application, setApplication] = useState<ProviderApplicationDetail | null>(null);
+  const [isLoadingApplication, setIsLoadingApplication] = useState(true);
+  const [documents, setDocuments] = useState<ApplicationDocument[]>(DOCUMENT_TYPES);
 
   const [activeTab, setActiveTab] = useState("Overview");
   const [flagsExpanded, setFlagsExpanded] = useState(true);
   const [compareMode, setCompareMode] = useState(false);
   const [zoomLevel, setZoomLevel] = useState(100);
   const [rotation, setRotation] = useState(0);
-  const [selectedDoc, setSelectedDoc] = useState<typeof DOCUMENT_TYPES[0] | null>(null);
+  const [selectedDoc, setSelectedDoc] = useState<ApplicationDocument | null>(null);
   const [nbiNumber, setNbiNumber] = useState("");
   const [prcNumber, setPrcNumber] = useState("");
   const [tinNumber, setTinNumber] = useState("");
@@ -299,7 +437,56 @@ export function ProviderApplicationReview() {
   const [govIdNumber, setGovIdNumber] = useState(application?.govIdNumber || "");
   const [ocrRunning, setOcrRunning] = useState(false);
 
+  useEffect(() => {
+    if (!applicationId) {
+      setIsLoadingApplication(false);
+      return;
+    }
+
+    const apiBaseUrl = getApiBaseUrl();
+    const detailUrl = `${apiBaseUrl}/api/admin/v1/users/provider-applications/${encodeURIComponent(applicationId)}`;
+
+    setIsLoadingApplication(true);
+    fetch(detailUrl, {
+      headers: getAuthHeaders(),
+    })
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error(`Failed to fetch provider application: ${response.status} ${response.statusText}`);
+        }
+        return response.json();
+      })
+      .then((data) => {
+        const normalized = normalizeDetail(data, applicationId);
+        setApplication(normalized);
+        setDocuments(normalizeDocuments(data));
+        setNotes(normalized.notes || []);
+        setGovIdType(normalized.govIdType || "PhilSys National ID");
+        setGovIdNumber(normalized.govIdNumber || "");
+      })
+      .catch((error) => {
+        console.warn("Provider application details could not be loaded.", error);
+        alert("Provider application details could not be loaded. Please try again.");
+        setApplication(null);
+        setDocuments([]);
+      })
+      .finally(() => {
+        setIsLoadingApplication(false);
+      });
+  }, [applicationId]);
+
   /* ── Not Found ── */
+  if (isLoadingApplication) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <div className="text-center space-y-3">
+          <RefreshCw className="w-10 h-10 text-[#16A34A] mx-auto animate-spin" />
+          <p className="text-gray-500 text-sm">Loading provider application...</p>
+        </div>
+      </div>
+    );
+  }
+
   if (!application) {
     return (
       <div className="flex items-center justify-center h-96">
@@ -318,7 +505,7 @@ export function ProviderApplicationReview() {
   /* ── Derived values ── */
   const checkedCount          = checklist.filter(c => c.checked).length;
   const canApprove            = checkedCount === checklist.length;
-  const verifiedDocs          = DOCUMENT_TYPES.filter(d => d.status === "verified").length;
+  const verifiedDocs          = documents.filter(d => d.status === "verified").length;
   const businessCheckedCount  = businessChecklist.filter(c => c.checked).length;
 
   /* ── Handlers ── */
@@ -344,12 +531,37 @@ export function ProviderApplicationReview() {
     setAdminNote("");
   };
 
-  const openDocModal = (doc: typeof DOCUMENT_TYPES[0]) => {
+  const openDocModal = (doc: ApplicationDocument) => {
     setSelectedDoc(doc);
     setZoomLevel(100);
     setRotation(0);
     setCompareMode(false);
     setShowDocModal(true);
+  };
+
+  const handleApproveApplication = async () => {
+    const result = await patchApplicationStatus(application.applicationId, { status: "approved" });
+    if (!result.success) {
+      alert(result.error || "Provider application could not be approved.");
+      return;
+    }
+
+    setShowApproveModal(false);
+    navigate("/provider-applications", { state: { refreshProviderApplications: Date.now() } });
+  };
+
+  const handleRejectApplication = async () => {
+    const result = await patchApplicationStatus(application.applicationId, {
+      status: "rejected",
+      reject_reason: rejectionReason,
+    });
+    if (!result.success) {
+      alert(result.error || "Provider application could not be rejected.");
+      return;
+    }
+
+    setShowRejectModal(false);
+    navigate("/provider-applications", { state: { refreshProviderApplications: Date.now() } });
   };
 
   /* ═══════════════════════════════════════════════════════════════ */
@@ -684,12 +896,12 @@ export function ProviderApplicationReview() {
                 <CardTitle className="text-base flex items-center gap-2">
                   <FileText className="w-4 h-4 text-[#16A34A]" />
                   Uploaded Documents
-                  <span className="ml-auto text-xs text-gray-400 font-normal">{verifiedDocs}/{DOCUMENT_TYPES.length} Verified</span>
+                  <span className="ml-auto text-xs text-gray-400 font-normal">{verifiedDocs}/{documents.length} Verified</span>
                 </CardTitle>
               </CardHeader>
               <CardContent className="pt-0">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {DOCUMENT_TYPES.map(doc => (
+                  {documents.map(doc => (
                     <div
                       key={doc.id}
                       className="border border-gray-100 rounded-xl p-3 hover:border-gray-200 hover:shadow-sm transition-all group"
@@ -1130,7 +1342,7 @@ export function ProviderApplicationReview() {
             <Button variant="outline" onClick={() => setShowApproveModal(false)}>Cancel</Button>
             <Button
               className="bg-[#16A34A] hover:bg-[#15803D] gap-2"
-              onClick={() => { setShowApproveModal(false); navigate("/provider-applications"); }}
+              onClick={handleApproveApplication}
             >
               <CheckCircle className="w-4 h-4" />Confirm Approval
             </Button>
@@ -1166,7 +1378,7 @@ export function ProviderApplicationReview() {
             <Button
               variant="destructive"
               disabled={!rejectionReason.trim()}
-              onClick={() => { setShowRejectModal(false); navigate("/provider-applications"); }}
+              onClick={handleRejectApplication}
               className="gap-2"
             >
               <XCircle className="w-4 h-4" />Confirm Rejection

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Badge } from "../components/ui/badge";
@@ -49,6 +49,7 @@ import {
   Users,
   ScanLine,
 } from "lucide-react";
+import { useData } from "../../contexts/DataContext";
 
 /* ─── MOCK DATA ─────────────────────────────────────────────────── */
 const PROVIDERS: Record<string, {
@@ -259,12 +260,155 @@ const TAB_EMPTY_ICONS: Record<string, React.ReactNode> = {
   "Background Check": <ShieldCheck className="w-10 h-10 text-gray-200 mb-3" />,
 };
 
+type ProviderDetail = typeof DEFAULT_PROVIDER;
+
+const EMPTY_PROVIDER: ProviderDetail = {
+  id: "",
+  businessName: "Provider Details",
+  ownerName: "N/A",
+  category: "N/A",
+  location: "N/A",
+  phone: "N/A",
+  email: "N/A",
+  website: "N/A",
+  rating: 0,
+  totalBookings: 0,
+  completionRate: 0,
+  verificationLevel: "Basic",
+  approvalDate: "N/A",
+  approvedBy: "N/A",
+  joinDate: "N/A",
+  nbiNumber: "N/A",
+  prcNumber: "N/A",
+  tinNumber: "N/A",
+  bgCheckStatus: "Concern",
+  totalScore: 0,
+  checklist: [],
+  notes: [],
+  auditTrail: [],
+  services: [],
+  govIdType: "N/A",
+  govIdNumber: "N/A",
+  ocrConfidence: 0,
+};
+
+function getApiBaseUrl(): string {
+  return import.meta.env.VITE_API_BASE_URL || "";
+}
+
+function getAuthHeaders(): Record<string, string> {
+  const token = localStorage.getItem("servease_admin_token");
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {};
+}
+
+function getNestedRecord(record: Record<string, unknown>, key: string): Record<string, unknown> {
+  return asRecord(record[key]);
+}
+
+function getString(record: Record<string, unknown>, keys: string[], fallback = ""): string {
+  for (const key of keys) {
+    const value = record[key];
+    if (value != null && value !== "") {
+      return String(value);
+    }
+  }
+  return fallback;
+}
+
+function getNumber(record: Record<string, unknown>, keys: string[], fallback = 0): number {
+  for (const key of keys) {
+    const value = record[key];
+    if (value != null && value !== "") {
+      const number = Number(value);
+      return Number.isFinite(number) ? number : fallback;
+    }
+  }
+  return fallback;
+}
+
+function formatDisplayDate(value: string, fallback: string): string {
+  if (!value) {
+    return fallback;
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return date.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+function getBackendProvider(response: unknown): Record<string, unknown> {
+  const record = asRecord(response);
+  const data = asRecord(record.data);
+  if (Object.keys(data).length > 0) {
+    return data;
+  }
+
+  const provider = asRecord(record.provider);
+  return Object.keys(provider).length > 0 ? provider : record;
+}
+
+function normalizeProviderDetail(response: unknown, fallback: ProviderDetail): ProviderDetail {
+  const provider = getBackendProvider(response);
+  const category = getNestedRecord(provider, "category");
+  const user = getNestedRecord(provider, "user");
+  const profile = getNestedRecord(provider, "profile");
+  const ownerFallback = getString(user, ["name", "fullName", "full_name"], getString(profile, ["name", "fullName", "full_name"], fallback.ownerName));
+  const completedBookings = getNumber(provider, ["completedBookings", "completed_bookings", "completedBookingCount", "completed_booking_count"]);
+  const totalBookings = getNumber(provider, ["totalBookings", "total_bookings", "bookingCount", "booking_count", "bookings_count"], fallback.totalBookings);
+  const createdAt = getString(provider, ["joinedDate", "joined_date", "createdAt", "created_at"]);
+  const approvedAt = getString(provider, ["approvalDate", "approval_date", "approvedAt", "approved_at"], createdAt);
+
+  return {
+    ...fallback,
+    id: getString(provider, ["id", "providerId", "provider_id", "user_id"], fallback.id),
+    businessName: getString(provider, ["businessName", "business_name", "companyName", "company_name", "name"], fallback.businessName),
+    ownerName: getString(provider, ["contactPerson", "contact_person", "ownerName", "owner_name", "fullName", "full_name"], ownerFallback),
+    category: getString(provider, ["categoryName", "category_name"], getString(category, ["name", "categoryName", "category_name"], fallback.category)),
+    location: getString(provider, ["location", "address", "city"], fallback.location),
+    phone: getString(provider, ["phone", "phoneNumber", "phone_number", "mobile"], getString(user, ["phone", "phoneNumber", "phone_number", "mobile"], fallback.phone)),
+    email: getString(provider, ["email"], getString(user, ["email"], fallback.email)),
+    website: getString(provider, ["website", "websiteUrl", "website_url"], fallback.website),
+    rating: getNumber(provider, ["rating", "averageRating", "average_rating"], fallback.rating),
+    totalBookings,
+    completionRate: getNumber(provider, ["completionRate", "completion_rate"], totalBookings > 0 ? (completedBookings / totalBookings) * 100 : fallback.completionRate),
+    verificationLevel: getString(provider, ["verificationLevel", "verification_level"], fallback.verificationLevel) as ProviderDetail["verificationLevel"],
+    approvalDate: formatDisplayDate(approvedAt, fallback.approvalDate),
+    approvedBy: getString(provider, ["approvedBy", "approved_by"], fallback.approvedBy),
+    joinDate: formatDisplayDate(createdAt, fallback.joinDate),
+    nbiNumber: getString(provider, ["nbiNumber", "nbi_number"], fallback.nbiNumber),
+    prcNumber: getString(provider, ["prcNumber", "prc_number"], fallback.prcNumber),
+    tinNumber: getString(provider, ["tinNumber", "tin_number"], fallback.tinNumber),
+    bgCheckStatus: getString(provider, ["bgCheckStatus", "bg_check_status", "backgroundCheckStatus", "background_check_status"], fallback.bgCheckStatus) as ProviderDetail["bgCheckStatus"],
+    totalScore: getNumber(provider, ["totalScore", "total_score", "score"], fallback.totalScore),
+    services: Array.isArray(provider.services) ? provider.services.map(String) : fallback.services,
+    govIdType: getString(provider, ["govIdType", "gov_id_type", "governmentIdType", "government_id_type"], fallback.govIdType),
+    govIdNumber: getString(provider, ["govIdNumber", "gov_id_number", "governmentIdNumber", "government_id_number"], fallback.govIdNumber),
+    ocrConfidence: getNumber(provider, ["ocrConfidence", "ocr_confidence"], fallback.ocrConfidence),
+  };
+}
+
 /* ─── MAIN COMPONENT ─────────────────────────────────────────────── */
 export function ServiceProviderDetails() {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
-  const provider = (id && PROVIDERS[id]) ? PROVIDERS[id] : DEFAULT_PROVIDER;
+  const { updateProviderStatus } = useData();
 
+  const [provider, setProvider] = useState<ProviderDetail | null>(null);
+  const [isLoadingProvider, setIsLoadingProvider] = useState(true);
+  const [isRevoking, setIsRevoking] = useState(false);
   const [activeTab, setActiveTab] = useState("Documents");
   const [showRevokeModal, setShowRevokeModal] = useState(false);
   const [showDocModal, setShowDocModal] = useState(false);
@@ -279,6 +423,99 @@ export function ServiceProviderDetails() {
     setZoomLevel(100);
     setShowDocModal(true);
   };
+
+  useEffect(() => {
+    if (!id) {
+      setProvider(null);
+      setIsLoadingProvider(false);
+      return;
+    }
+
+    const apiBaseUrl = getApiBaseUrl();
+    const providerUrl = `${apiBaseUrl}/api/admin/v1/users/providers/${encodeURIComponent(id)}`;
+
+    setIsLoadingProvider(true);
+    fetch(providerUrl, {
+      headers: getAuthHeaders(),
+    })
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error(`Failed to fetch service provider: ${response.status} ${response.statusText}`);
+        }
+        return response.json();
+      })
+      .then((data) => {
+        setProvider(normalizeProviderDetail(data, EMPTY_PROVIDER));
+      })
+      .catch((error) => {
+        console.warn("Provider details could not be loaded.", error);
+        alert("Provider details could not be loaded. Please try again.");
+        setProvider(null);
+      })
+      .finally(() => setIsLoadingProvider(false));
+  }, [id]);
+
+  const handleRevokeVerification = async () => {
+    if (!id || !revokeReason.trim()) {
+      return;
+    }
+
+    setIsRevoking(true);
+    try {
+      const result = await updateProviderStatus(id, "Suspended");
+      if (result.success) {
+        setShowRevokeModal(false);
+        navigate("/service-providers");
+      }
+    } catch (error) {
+      console.warn("Provider revocation failed. Keeping current provider unchanged.", error);
+      alert("Provider verification could not be revoked. Please try again.");
+    } finally {
+      setIsRevoking(false);
+    }
+  };
+
+  if (isLoadingProvider) {
+    return (
+      <div className="space-y-5">
+        <div className="flex items-center gap-3">
+          <Button variant="outline" size="sm" onClick={() => navigate("/service-providers")} className="gap-2 shrink-0">
+            <ArrowLeft className="w-4 h-4" />Back
+          </Button>
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Provider Details</h1>
+            <p className="text-gray-500 text-sm mt-0.5">Loading provider details...</p>
+          </div>
+        </div>
+        <Card>
+          <CardContent className="p-8 text-center text-gray-500">
+            Loading provider details...
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (!provider) {
+    return (
+      <div className="space-y-5">
+        <div className="flex items-center gap-3">
+          <Button variant="outline" size="sm" onClick={() => navigate("/service-providers")} className="gap-2 shrink-0">
+            <ArrowLeft className="w-4 h-4" />Back
+          </Button>
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Provider Details</h1>
+            <p className="text-gray-500 text-sm mt-0.5">Provider details could not be loaded.</p>
+          </div>
+        </div>
+        <Card>
+          <CardContent className="p-8 text-center text-gray-500">
+            Provider details could not be loaded. Please try again.
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-5">
@@ -806,11 +1043,11 @@ export function ServiceProviderDetails() {
             <Button variant="outline" onClick={() => setShowRevokeModal(false)}>Cancel</Button>
             <Button
               variant="destructive"
-              disabled={!revokeReason.trim()}
-              onClick={() => { setShowRevokeModal(false); navigate("/service-providers"); }}
+              disabled={!revokeReason.trim() || isRevoking}
+              onClick={handleRevokeVerification}
               className="gap-2"
             >
-              <AlertTriangle className="w-4 h-4" />Confirm Revocation
+              <AlertTriangle className="w-4 h-4" />{isRevoking ? "Revoking..." : "Confirm Revocation"}
             </Button>
           </DialogFooter>
         </DialogContent>

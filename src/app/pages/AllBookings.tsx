@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
@@ -29,6 +29,7 @@ import {
   DollarSign,
   TrendingUp,
   CalendarClock,
+  Loader2,
 } from "lucide-react";
 import { useData } from "../../contexts/DataContext";
 import type { Booking, BookingStatus } from "../../types";
@@ -36,12 +37,38 @@ import type { Booking, BookingStatus } from "../../types";
 type BookingTab = "all" | "upcoming" | "ongoing" | "completed" | "cancelled";
 
 export function AllBookings() {
-  const { bookings, getCustomerById, getProviderById, getCategoryById } = useData();
+  const {
+    bookings,
+    isLoadingBookings,
+    serviceCategories,
+    fetchBookings,
+    fetchServiceCategories,
+    getCustomerById,
+    getProviderById,
+    getCategoryById,
+  } = useData();
   
   const [activeTab, setActiveTab] = useState<BookingTab>("all");
   const [searchTerm, setSearchTerm] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [dateFilter, setDateFilter] = useState<string>("all");
+
+  useEffect(() => {
+    void fetchBookings();
+    void fetchServiceCategories();
+  }, [fetchBookings, fetchServiceCategories]);
+
+  const getBookingCustomerName = (booking: Booking) =>
+    booking.customerName || getCustomerById(booking.customerId)?.name || "N/A";
+
+  const getBookingCustomerEmail = (booking: Booking) =>
+    booking.customerEmail || getCustomerById(booking.customerId)?.email || "";
+
+  const getBookingProviderName = (booking: Booking) =>
+    booking.providerName || getProviderById(booking.providerId)?.businessName || "N/A";
+
+  const getBookingCategoryName = (booking: Booking) =>
+    booking.categoryName || getCategoryById(booking.categoryId)?.name || "N/A";
 
   // Filter bookings
   const filteredBookings = useMemo(() => {
@@ -71,10 +98,13 @@ export function AllBookings() {
 
       const matchesSearch =
         booking.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        getCustomerById(booking.customerId)?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        getProviderById(booking.providerId)?.businessName.toLowerCase().includes(searchTerm.toLowerCase());
+        getBookingCustomerName(booking).toLowerCase().includes(searchTerm.toLowerCase()) ||
+        getBookingProviderName(booking).toLowerCase().includes(searchTerm.toLowerCase());
 
-      const matchesCategory = categoryFilter === "all" || booking.categoryId === categoryFilter;
+      const matchesCategory =
+        categoryFilter === "all" ||
+        booking.categoryId === categoryFilter ||
+        booking.categoryName === categoryFilter;
 
       // Date filter logic
       let matchesDate = true;
@@ -98,7 +128,7 @@ export function AllBookings() {
 
       return matchesTab && matchesSearch && matchesCategory && matchesDate;
     });
-  }, [bookings, activeTab, searchTerm, categoryFilter, dateFilter, getCustomerById, getProviderById]);
+  }, [bookings, activeTab, searchTerm, categoryFilter, dateFilter, getCustomerById, getProviderById, getCategoryById]);
 
   // Calculate stats
   const stats = useMemo(() => {
@@ -345,12 +375,9 @@ export function AllBookings() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Categories</SelectItem>
-                <SelectItem value="CAT-001">Home Maintenance</SelectItem>
-                <SelectItem value="CAT-002">Beauty & Wellness</SelectItem>
-                <SelectItem value="CAT-003">Cleaning Services</SelectItem>
-                <SelectItem value="CAT-004">Pet Services</SelectItem>
-                <SelectItem value="CAT-005">Events</SelectItem>
-                <SelectItem value="CAT-006">Auto & Tech</SelectItem>
+                {serviceCategories.map((category) => (
+                  <SelectItem key={category.id} value={category.id}>{category.name}</SelectItem>
+                ))}
               </SelectContent>
             </Select>
 
@@ -384,7 +411,16 @@ export function AllBookings() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredBookings.length === 0 ? (
+                {isLoadingBookings ? (
+                  <TableRow>
+                    <TableCell colSpan={8} className="text-center py-8 text-gray-500">
+                      <div className="flex items-center justify-center gap-2">
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Loading bookings...
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ) : filteredBookings.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={8} className="text-center py-8 text-gray-500">
                       No bookings found
@@ -392,10 +428,6 @@ export function AllBookings() {
                   </TableRow>
                 ) : (
                   filteredBookings.map((booking) => {
-                    const customer = getCustomerById(booking.customerId);
-                    const provider = getProviderById(booking.providerId);
-                    const category = getCategoryById(booking.categoryId);
-
                     return (
                       <TableRow key={booking.id}>
                         <TableCell>
@@ -405,14 +437,14 @@ export function AllBookings() {
                         </TableCell>
                         <TableCell>
                           <div>
-                            <p className="font-medium text-gray-900">{customer?.name}</p>
-                            <p className="text-xs text-gray-500">{customer?.email}</p>
+                            <p className="font-medium text-gray-900">{getBookingCustomerName(booking)}</p>
+                            <p className="text-xs text-gray-500">{getBookingCustomerEmail(booking)}</p>
                           </div>
                         </TableCell>
                         <TableCell>
                           <div>
-                            <p className="font-medium text-gray-900">{provider?.businessName}</p>
-                            <p className="text-xs text-gray-500">{category?.name}</p>
+                            <p className="font-medium text-gray-900">{getBookingProviderName(booking)}</p>
+                            <p className="text-xs text-gray-500">{getBookingCategoryName(booking)}</p>
                           </div>
                         </TableCell>
                         <TableCell>

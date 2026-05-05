@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
@@ -39,13 +39,17 @@ import {
 import { useData } from "../../contexts/DataContext";
 
 export function RefundManagement() {
-  const { refunds, getCustomerById, getBookingById, approveRefund, rejectRefund } = useData();
+  const { refunds, isLoadingRefunds, fetchRefunds, getCustomerById, getBookingById, approveRefund, rejectRefund } = useData();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [selectedRefund, setSelectedRefund] = useState<string | null>(null);
   const [showApproveDialog, setShowApproveDialog] = useState(false);
   const [showRejectDialog, setShowRejectDialog] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
+
+  useEffect(() => {
+    fetchRefunds();
+  }, [fetchRefunds]);
 
   const filteredRefunds = useMemo(() => {
     return refunds.filter((refund) => {
@@ -55,6 +59,7 @@ export function RefundManagement() {
       const matchesSearch =
         refund.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
         refund.bookingId.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        refund.customerName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         customer?.name.toLowerCase().includes(searchTerm.toLowerCase());
 
       const matchesStatus = statusFilter === "all" || refund.status === statusFilter;
@@ -65,39 +70,41 @@ export function RefundManagement() {
 
   const stats = useMemo(() => {
     const pending = refunds.filter((r) => r.status === "Pending");
-    const approved = refunds.filter((r) => r.status === "Approved");
     const processed = refunds.filter((r) => r.status === "Processed");
     const rejected = refunds.filter((r) => r.status === "Rejected");
 
     const pendingAmount = pending.reduce((sum, r) => sum + r.amount, 0);
-    const approvedAmount = approved.reduce((sum, r) => sum + r.amount, 0);
     const processedAmount = processed.reduce((sum, r) => sum + r.amount, 0);
 
     return {
       pendingCount: pending.length,
-      approvedCount: approved.length,
+      approvedCount: 0,
       processedCount: processed.length,
       rejectedCount: rejected.length,
       pendingAmount,
-      approvedAmount,
+      approvedAmount: 0,
       processedAmount,
     };
   }, [refunds]);
 
-  const handleApprove = () => {
+  const handleApprove = async () => {
     if (selectedRefund) {
-      approveRefund(selectedRefund);
-      setShowApproveDialog(false);
-      setSelectedRefund(null);
+      const result = await approveRefund(selectedRefund);
+      if (result.success) {
+        setShowApproveDialog(false);
+        setSelectedRefund(null);
+      }
     }
   };
 
-  const handleReject = () => {
+  const handleReject = async () => {
     if (selectedRefund && rejectReason) {
-      rejectRefund(selectedRefund, rejectReason);
-      setShowRejectDialog(false);
-      setSelectedRefund(null);
-      setRejectReason("");
+      const result = await rejectRefund(selectedRefund, rejectReason);
+      if (result.success) {
+        setShowRejectDialog(false);
+        setSelectedRefund(null);
+        setRejectReason("");
+      }
     }
   };
 
@@ -242,7 +249,6 @@ export function RefundManagement() {
               <SelectContent>
                 <SelectItem value="all">All Statuses</SelectItem>
                 <SelectItem value="Pending">Pending</SelectItem>
-                <SelectItem value="Approved">Approved</SelectItem>
                 <SelectItem value="Processed">Processed</SelectItem>
                 <SelectItem value="Rejected">Rejected</SelectItem>
               </SelectContent>
@@ -265,7 +271,13 @@ export function RefundManagement() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredRefunds.length === 0 ? (
+                {isLoadingRefunds ? (
+                  <TableRow>
+                    <TableCell colSpan={8} className="text-center py-8 text-gray-500">
+                      Loading refund requests...
+                    </TableCell>
+                  </TableRow>
+                ) : filteredRefunds.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={8} className="text-center py-8 text-gray-500">
                       No refund requests found
@@ -291,9 +303,9 @@ export function RefundManagement() {
                         <TableCell>
                           <div>
                             <p className="text-sm font-medium text-gray-900">
-                              {customer?.name || "N/A"}
+                              {customer?.name || refund.customerName || "N/A"}
                             </p>
-                            <p className="text-xs text-gray-500">{customer?.email}</p>
+                            <p className="text-xs text-gray-500">{customer?.email || refund.customerEmail}</p>
                           </div>
                         </TableCell>
                         <TableCell>
@@ -326,7 +338,7 @@ export function RefundManagement() {
                                 className="bg-[#16A34A] hover:bg-[#15803D]"
                               >
                                 <ThumbsUp className="w-3 h-3 mr-1" />
-                                Approve
+                                Process Refund
                               </Button>
                               <Button
                                 size="sm"
@@ -359,7 +371,7 @@ export function RefundManagement() {
           <DialogHeader>
             <DialogTitle>Approve Refund Request</DialogTitle>
             <DialogDescription>
-              Are you sure you want to approve this refund? The amount will be returned to the customer's card.
+              Are you sure you want to process this refund? The amount will be returned to the customer's card.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -373,7 +385,7 @@ export function RefundManagement() {
               Cancel
             </Button>
             <Button onClick={handleApprove} className="bg-[#16A34A] hover:bg-[#15803D]">
-              Approve Refund
+              Process Refund
             </Button>
           </DialogFooter>
         </DialogContent>

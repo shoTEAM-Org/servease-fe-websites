@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
@@ -29,14 +29,13 @@ import {
 import { useData } from "../../contexts/DataContext";
 
 export function FailedPayments() {
-  const { transactions, getCustomerById, getProviderById, getCategoryById, bookings } = useData();
+  const { failedPayments, isLoadingFailedPayments, fetchFailedPayments, transactions, getCustomerById, getProviderById } = useData();
   const [searchTerm, setSearchTerm] = useState("");
   const [reasonFilter, setReasonFilter] = useState<string>("all");
 
-  // Get failed payment transactions
-  const failedPayments = useMemo(() => {
-    return transactions.filter((t) => t.paymentStatus === "Failed");
-  }, [transactions]);
+  useEffect(() => {
+    fetchFailedPayments();
+  }, [fetchFailedPayments]);
 
   const filteredPayments = useMemo(() => {
     return failedPayments.filter((payment) => {
@@ -256,7 +255,19 @@ export function FailedPayments() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredPayments.length === 0 ? (
+                {isLoadingFailedPayments ? (
+                  <TableRow>
+                    <TableCell colSpan={9} className="text-center py-8 text-gray-500">
+                      Loading failed payments...
+                    </TableCell>
+                  </TableRow>
+                ) : failedPayments.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={9} className="text-center py-8 text-gray-500">
+                      No failed payments found
+                    </TableCell>
+                  </TableRow>
+                ) : filteredPayments.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={9} className="text-center py-8 text-gray-500">
                       No failed payments found

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
@@ -37,7 +37,10 @@ import {
   MessageSquare,
   TrendingUp,
   Calendar,
+  Loader2,
 } from "lucide-react";
+import { useData } from "../../contexts/DataContext";
+import type { Booking } from "../../types";
 
 type LiveStatus = "Scheduled" | "In Progress" | "Completed" | "Cancelled";
 type PaymentStatus = "Paid" | "Pending" | "Failed";
@@ -189,8 +192,48 @@ const initialServices: OngoingService[] = [
   },
 ];
 
+function addHours(dateTime: string, hours: number): string {
+  const date = new Date(dateTime);
+  if (Number.isNaN(date.getTime())) {
+    return dateTime;
+  }
+  date.setHours(date.getHours() + hours);
+  return date.toISOString();
+}
+
+function bookingToLiveStatus(status: Booking["status"]): LiveStatus {
+  if (status === "In Progress") {
+    return "In Progress";
+  }
+  if (status === "Completed") {
+    return "Completed";
+  }
+  if (status === "Cancelled") {
+    return "Cancelled";
+  }
+  return "Scheduled";
+}
+
+function bookingToPaymentStatus(status: Booking["paymentStatus"]): PaymentStatus {
+  if (status === "Paid") {
+    return "Paid";
+  }
+  if (status === "Failed") {
+    return "Failed";
+  }
+  return "Pending";
+}
+
 export function OngoingServices() {
-  const [services, setServices] = useState<OngoingService[]>(initialServices);
+  const {
+    bookings,
+    isLoadingBookings,
+    fetchBookings,
+    getCustomerById,
+    getProviderById,
+    getCategoryById,
+    updateBookingStatus,
+  } = useData();
   const [searchTerm, setSearchTerm] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -202,6 +245,30 @@ export function OngoingServices() {
   const [cancelReason, setCancelReason] = useState("");
   const [escalationReason, setEscalationReason] = useState("");
   const [contactMessage, setContactMessage] = useState("");
+
+  useEffect(() => {
+    void fetchBookings();
+  }, [fetchBookings]);
+
+  const services = useMemo<OngoingService[]>(() => {
+    return bookings
+      .filter((booking) =>
+        ["Pending", "Confirmed", "In Progress", "Completed", "Cancelled"].includes(booking.status)
+      )
+      .map((booking) => ({
+        id: booking.id,
+        bookingId: booking.id,
+        customer: booking.customerName || getCustomerById(booking.customerId)?.name || "N/A",
+        provider: booking.providerName || getProviderById(booking.providerId)?.businessName || "N/A",
+        category: booking.categoryName || getCategoryById(booking.categoryId)?.name || "",
+        startTime: booking.scheduledDate,
+        expectedCompletion: booking.completedDate || addHours(booking.scheduledDate, 2),
+        liveStatus: bookingToLiveStatus(booking.status),
+        paymentStatus: bookingToPaymentStatus(booking.paymentStatus),
+        location: booking.location === "N/A" ? "" : booking.location,
+        amount: booking.amount,
+      }));
+  }, [bookings, getCategoryById, getCustomerById, getProviderById]);
 
   const filteredServices = services.filter((service) => {
     const matchesSearch =
@@ -216,6 +283,22 @@ export function OngoingServices() {
 
     return matchesSearch && matchesCategory && matchesStatus && matchesLocation;
   });
+
+  const categoryOptions = useMemo(
+    () =>
+      Array.from(new Set(services.map((service) => service.category)))
+        .filter((category) => category && category !== "N/A")
+        .sort((a, b) => a.localeCompare(b)),
+    [services]
+  );
+
+  const locationOptions = useMemo(
+    () =>
+      Array.from(new Set(services.map((service) => service.location)))
+        .filter((location) => location && location !== "N/A")
+        .sort((a, b) => a.localeCompare(b)),
+    [services]
+  );
 
   const activeBookings = services.filter((s) => s.liveStatus === "Scheduled" || s.liveStatus === "In Progress").length;
   const inProgress = services.filter((s) => s.liveStatus === "In Progress").length;
@@ -339,15 +422,16 @@ export function OngoingServices() {
     setContactModalOpen(true);
   };
 
-  const handleConfirmCancel = () => {
+  const handleConfirmCancel = async () => {
     if (!selectedService || !cancelReason.trim()) {
       alert("Please provide a cancellation reason");
       return;
     }
 
-    setServices((prev) =>
-      prev.map((s) => (s.id === selectedService.id ? { ...s, liveStatus: "Cancelled" } : s))
-    );
+    const result = await updateBookingStatus(selectedService.bookingId, "Cancelled");
+    if (!result.success) {
+      return;
+    }
 
     console.log("Audit Log:", {
       action: "ADMIN_FORCE_CANCEL",
@@ -359,7 +443,7 @@ export function OngoingServices() {
 
     setCancelModalOpen(false);
     setSelectedService(null);
-    alert("✅ Booking cancelled successfully!");
+    alert("Booking cancelled successfully!");
   };
 
   const handleConfirmEscalate = () => {
@@ -458,18 +542,19 @@ export function OngoingServices() {
             </div>
 
             {/* Category Filter */}
-            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+            <Select
+              value={categoryFilter}
+              onValueChange={setCategoryFilter}
+              disabled={categoryOptions.length === 0}
+            >
               <SelectTrigger>
                 <SelectValue placeholder="Filter by Category" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Categories</SelectItem>
-                <SelectItem value="Home Maintenance & Repair">Home Maintenance</SelectItem>
-                <SelectItem value="Beauty, Wellness & Personal Care">Beauty & Wellness</SelectItem>
-                <SelectItem value="Events & Entertainment">Events</SelectItem>
-                <SelectItem value="Pet Services">Pet Services</SelectItem>
-                <SelectItem value="Health & Fitness">Health & Fitness</SelectItem>
-                <SelectItem value="Automotive & Tech Support">Auto & Tech</SelectItem>
+                {categoryOptions.map((category) => (
+                  <SelectItem key={category} value={category}>{category}</SelectItem>
+                ))}
               </SelectContent>
             </Select>
 
@@ -488,18 +573,20 @@ export function OngoingServices() {
             </Select>
 
             {/* Location Filter */}
-            <Select value={locationFilter} onValueChange={setLocationFilter}>
+            <Select
+              value={locationFilter}
+              onValueChange={setLocationFilter}
+              disabled={locationOptions.length === 0}
+            >
               <SelectTrigger>
                 <MapPin className="w-4 h-4 mr-2" />
                 <SelectValue placeholder="Filter by Location" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Locations</SelectItem>
-                <SelectItem value="Makati">Makati City</SelectItem>
-                <SelectItem value="Quezon">Quezon City</SelectItem>
-                <SelectItem value="Pasig">Pasig City</SelectItem>
-                <SelectItem value="Taguig">Taguig City</SelectItem>
-                <SelectItem value="Manila">Manila City</SelectItem>
+                {locationOptions.map((location) => (
+                  <SelectItem key={location} value={location}>{location}</SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -521,7 +608,16 @@ export function OngoingServices() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredServices.length === 0 ? (
+                {isLoadingBookings ? (
+                  <TableRow>
+                    <TableCell colSpan={9} className="text-center py-8 text-gray-500">
+                      <div className="flex items-center justify-center gap-2">
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Loading services...
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ) : filteredServices.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={9} className="text-center py-8 text-gray-500">
                       No services found

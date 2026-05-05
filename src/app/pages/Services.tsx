@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
@@ -51,29 +51,31 @@ import {
   Clock,
 } from "lucide-react";
 import { useData } from "../../contexts/DataContext";
-
-// Mock Services Data
-const servicesData = [
-  { id: "SRV-001", name: "Plumbing Repair", category: "Home Maintenance & Repair", pricingType: "Fixed", basePrice: 500, status: "Active", lastUpdated: "2026-02-28", duration: "1-2 hours" },
-  { id: "SRV-002", name: "Aircon Cleaning", category: "Home Maintenance & Repair", pricingType: "Fixed", basePrice: 800, status: "Active", lastUpdated: "2026-02-27", duration: "2-3 hours" },
-  { id: "SRV-003", name: "House Cleaning", category: "Domestic & Cleaning Services", pricingType: "Hourly", basePrice: 250, status: "Active", lastUpdated: "2026-02-26", duration: "Per hour" },
-  { id: "SRV-004", name: "Massage Therapy", category: "Beauty, Wellness & Personal Care", pricingType: "Fixed", basePrice: 1200, status: "Active", lastUpdated: "2026-02-25", duration: "1 hour" },
-  { id: "SRV-005", name: "Event Photography", category: "Events & Entertainment", pricingType: "Starting at", basePrice: 15000, status: "Active", lastUpdated: "2026-02-24", duration: "4-8 hours" },
-  { id: "SRV-006", name: "Dog Grooming", category: "Pet Services", pricingType: "Fixed", basePrice: 600, status: "Active", lastUpdated: "2026-02-23", duration: "1-2 hours" },
-  { id: "SRV-007", name: "Car Wash", category: "Automotive & Tech Support", pricingType: "Fixed", basePrice: 300, status: "Active", lastUpdated: "2026-02-22", duration: "30-45 mins" },
-  { id: "SRV-008", name: "Tutoring (Math)", category: "Education & Professional Services", pricingType: "Hourly", basePrice: 400, status: "Active", lastUpdated: "2026-02-21", duration: "Per hour" },
-];
+import type { MarketplaceService } from "../../types";
 
 export function Services() {
-  const { serviceCategories } = useData();
+  const {
+    serviceCategories,
+    serviceProviders,
+    services,
+    isLoadingServices,
+    fetchServices,
+    fetchServiceCategories,
+    fetchServiceProviders,
+    createMarketplaceService,
+    updateMarketplaceService,
+    deleteMarketplaceService,
+    toggleMarketplaceServiceStatus,
+  } = useData();
   const [searchTerm, setSearchTerm] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [pricingTypeFilter, setPricingTypeFilter] = useState("all");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [selectedService, setSelectedService] = useState<any>(null);
+  const [selectedService, setSelectedService] = useState<MarketplaceService | null>(null);
   const [formData, setFormData] = useState({
+    providerId: "",
     name: "",
     category: "",
     description: "",
@@ -84,26 +86,37 @@ export function Services() {
     status: "Active",
   });
 
-  // Filter services
-  const filteredServices = servicesData.filter((service) => {
+  useEffect(() => {
+    void fetchServiceCategories();
+    void fetchServiceProviders();
+    void fetchServices();
+  }, [fetchServiceCategories, fetchServiceProviders, fetchServices]);
+
+  const filteredServices = services.filter((service) => {
     const matchesSearch = service.name.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCategory = categoryFilter === "all" || service.category === categoryFilter;
-    const matchesStatus = statusFilter === "all" || service.status.toLowerCase() === statusFilter;
+    const matchesStatus =
+      statusFilter === "all" ||
+      (statusFilter === "active" && service.isActive) ||
+      (statusFilter === "inactive" && !service.isActive);
     const matchesPricing = pricingTypeFilter === "all" || service.pricingType.toLowerCase() === pricingTypeFilter;
     return matchesSearch && matchesCategory && matchesStatus && matchesPricing;
   });
 
-  // Calculate stats
+  const averagePrice = services.length
+    ? Math.round(services.reduce((sum, service) => sum + service.basePrice, 0) / services.length)
+    : 0;
   const stats = {
-    total: servicesData.length,
-    active: servicesData.filter((s) => s.status === "Active").length,
-    inactive: servicesData.filter((s) => s.status === "Inactive").length,
-    avgPrice: Math.round(servicesData.reduce((sum, s) => sum + s.basePrice, 0) / servicesData.length),
+    total: services.length,
+    active: services.filter((service) => service.isActive).length,
+    inactive: services.filter((service) => !service.isActive).length,
+    avgPrice: averagePrice,
   };
 
   const handleAdd = () => {
     setSelectedService(null);
     setFormData({
+      providerId: "",
       name: "",
       category: "",
       description: "",
@@ -116,12 +129,13 @@ export function Services() {
     setIsDialogOpen(true);
   };
 
-  const handleEdit = (service: any) => {
+  const handleEdit = (service: MarketplaceService) => {
     setSelectedService(service);
     setFormData({
+      providerId: service.providerId,
       name: service.name,
       category: service.category,
-      description: "",
+      description: service.description || "",
       pricingType: service.pricingType,
       price: service.basePrice.toString(),
       duration: service.duration,
@@ -131,32 +145,68 @@ export function Services() {
     setIsDialogOpen(true);
   };
 
-  const handleSave = () => {
-    console.log("Saving service:", formData);
-    alert(`✅ Service ${selectedService ? "updated" : "created"} successfully!`);
+  const handleSave = async () => {
+    if (!formData.name.trim() || !formData.category || !formData.price || Number(formData.price) <= 0) {
+      alert("Provider, category, service name, and price are required.");
+      return;
+    }
+
+    if (!selectedService) {
+      if (!formData.providerId) {
+        alert("Provider, category, service name, and price are required.");
+        return;
+      }
+
+      const result = await createMarketplaceService(formData);
+      if (!result.success) {
+        return;
+      }
+
+      alert("Service created successfully!");
+      setIsDialogOpen(false);
+      return;
+    }
+
+    const result = await updateMarketplaceService(selectedService.id, formData);
+    if (!result.success) {
+      return;
+    }
+
+    alert("Service updated successfully!");
     setIsDialogOpen(false);
   };
 
-  const handleDelete = (service: any) => {
+  const handleDelete = (service: MarketplaceService) => {
     setSelectedService(service);
     setDeleteDialogOpen(true);
   };
 
-  const confirmDelete = () => {
-    console.log("Deleting service:", selectedService);
-    alert(`✅ Service "${selectedService?.name}" deleted successfully!`);
+  const confirmDelete = async () => {
+    if (!selectedService) {
+      return;
+    }
+
+    const result = await deleteMarketplaceService(selectedService.id);
+    if (!result.success) {
+      return;
+    }
+
+    alert(`Service "${selectedService.name}" deleted successfully!`);
     setDeleteDialogOpen(false);
     setSelectedService(null);
   };
 
-  const toggleStatus = (service: any) => {
-    console.log("Toggling status for:", service.name);
-    alert(`✅ Service "${service.name}" status toggled!`);
+  const toggleStatus = async (service: MarketplaceService) => {
+    const result = await toggleMarketplaceServiceStatus(service.id, !service.isActive);
+    if (!result.success) {
+      return;
+    }
+
+    alert(`Service "${service.name}" status toggled!`);
   };
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div>
         <h1 className="text-3xl font-bold text-gray-900">Services</h1>
         <p className="text-gray-500 mt-1">
@@ -164,7 +214,6 @@ export function Services() {
         </p>
       </div>
 
-      {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <Card>
           <CardContent className="p-6">
@@ -223,7 +272,6 @@ export function Services() {
         </Card>
       </div>
 
-      {/* Main Services Table */}
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
@@ -235,14 +283,13 @@ export function Services() {
           </div>
         </CardHeader>
         <CardContent>
-          {/* Search & Filters */}
           <div className="mb-6 grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
               <Input
                 placeholder="Search services..."
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                onChange={(event) => setSearchTerm(event.target.value)}
                 className="pl-10"
               />
             </div>
@@ -285,7 +332,6 @@ export function Services() {
             </Select>
           </div>
 
-          {/* Table */}
           <div className="border rounded-lg overflow-hidden">
             <Table>
               <TableHeader>
@@ -301,85 +347,93 @@ export function Services() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredServices.map((service) => (
-                  <TableRow key={service.id}>
-                    <TableCell>
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                          <Package className="w-5 h-5 text-blue-600" />
-                        </div>
-                        <div>
-                          <p className="font-medium text-gray-900">{service.name}</p>
-                          <p className="text-xs text-gray-500">{service.id}</p>
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-sm text-gray-700">{service.category}</TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">
-                        {service.pricingType}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right font-semibold text-gray-900">
-                      ₱{service.basePrice.toLocaleString()}
-                      {service.pricingType === "Hourly" && <span className="text-xs text-gray-500">/hr</span>}
-                    </TableCell>
-                    <TableCell className="text-sm text-gray-600">
-                      <div className="flex items-center gap-1">
-                        <Clock className="w-3 h-3" />
-                        {service.duration}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge
-                        className={
-                          service.status === "Active"
-                            ? "bg-[#DCFCE7] text-[#15803D] border-[#BBF7D0]"
-                            : "bg-red-100 text-red-700 border-red-200"
-                        }
-                      >
-                        {service.status === "Active" ? (
-                          <CheckCircle className="w-3 h-3 mr-1" />
-                        ) : (
-                          <XCircle className="w-3 h-3 mr-1" />
-                        )}
-                        {service.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-sm text-gray-500">{service.lastUpdated}</TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <Button variant="outline" size="sm" onClick={() => handleEdit(service)}>
-                          <Edit className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => toggleStatus(service)}
-                        >
-                          {service.status === "Active" ? (
-                            <EyeOff className="w-4 h-4" />
-                          ) : (
-                            <Eye className="w-4 h-4" />
-                          )}
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                          onClick={() => handleDelete(service)}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </div>
+                {isLoadingServices ? (
+                  <TableRow>
+                    <TableCell colSpan={8} className="text-center py-8 text-gray-500">
+                      Loading services...
                     </TableCell>
                   </TableRow>
-                ))}
+                ) : (
+                  filteredServices.map((service) => (
+                    <TableRow key={service.id}>
+                      <TableCell>
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                            <Package className="w-5 h-5 text-blue-600" />
+                          </div>
+                          <div>
+                            <p className="font-medium text-gray-900">{service.name}</p>
+                            <p className="text-xs text-gray-500">{service.id}</p>
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-sm text-gray-700">{service.category}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">
+                          {service.pricingType}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right font-semibold text-gray-900">
+                        ₱{service.basePrice.toLocaleString()}
+                        {service.pricingType === "Hourly" && <span className="text-xs text-gray-500">/hr</span>}
+                      </TableCell>
+                      <TableCell className="text-sm text-gray-600">
+                        <div className="flex items-center gap-1">
+                          <Clock className="w-3 h-3" />
+                          {service.duration}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          className={
+                            service.isActive
+                              ? "bg-[#DCFCE7] text-[#15803D] border-[#BBF7D0]"
+                              : "bg-red-100 text-red-700 border-red-200"
+                          }
+                        >
+                          {service.isActive ? (
+                            <CheckCircle className="w-3 h-3 mr-1" />
+                          ) : (
+                            <XCircle className="w-3 h-3 mr-1" />
+                          )}
+                          {service.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-sm text-gray-500">{service.lastUpdated}</TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <Button variant="outline" size="sm" onClick={() => handleEdit(service)}>
+                            <Edit className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => toggleStatus(service)}
+                          >
+                            {service.isActive ? (
+                              <Eye className="w-4 h-4" />
+                            ) : (
+                              <EyeOff className="w-4 h-4" />
+                            )}
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                            onClick={() => handleDelete(service)}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
               </TableBody>
             </Table>
           </div>
 
-          {filteredServices.length === 0 && (
+          {!isLoadingServices && filteredServices.length === 0 && (
             <div className="text-center py-12">
               <Package className="w-12 h-12 text-gray-300 mx-auto mb-4" />
               <p className="text-gray-500">No services found</p>
@@ -389,20 +443,40 @@ export function Services() {
         </CardContent>
       </Card>
 
-      {/* Add/Edit Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>{selectedService ? "Edit Service" : "Add New Service"}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
+            {!selectedService && (
+              <div className="space-y-2">
+                <Label htmlFor="provider">Provider *</Label>
+                <Select
+                  value={formData.providerId}
+                  onValueChange={(value) => setFormData({ ...formData, providerId: value })}
+                >
+                  <SelectTrigger id="provider">
+                    <SelectValue placeholder="Select provider" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {serviceProviders.map((provider) => (
+                      <SelectItem key={provider.id} value={provider.id}>
+                        {provider.businessName}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
             <div className="space-y-2">
               <Label htmlFor="name">Service Name *</Label>
               <Input
                 id="name"
                 placeholder="e.g., Plumbing Repair"
                 value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                onChange={(event) => setFormData({ ...formData, name: event.target.value })}
               />
             </div>
 
@@ -429,7 +503,7 @@ export function Services() {
                 placeholder="Brief description of the service..."
                 rows={3}
                 value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                onChange={(event) => setFormData({ ...formData, description: event.target.value })}
               />
             </div>
 
@@ -457,7 +531,7 @@ export function Services() {
                   type="number"
                   placeholder="0"
                   value={formData.price}
-                  onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                  onChange={(event) => setFormData({ ...formData, price: event.target.value })}
                 />
               </div>
             </div>
@@ -468,7 +542,7 @@ export function Services() {
                 id="duration"
                 placeholder="e.g., 1-2 hours"
                 value={formData.duration}
-                onChange={(e) => setFormData({ ...formData, duration: e.target.value })}
+                onChange={(event) => setFormData({ ...formData, duration: event.target.value })}
               />
             </div>
 
@@ -479,7 +553,7 @@ export function Services() {
                 placeholder="List of materials required..."
                 rows={2}
                 value={formData.materials}
-                onChange={(e) => setFormData({ ...formData, materials: e.target.value })}
+                onChange={(event) => setFormData({ ...formData, materials: event.target.value })}
               />
             </div>
 
@@ -507,7 +581,6 @@ export function Services() {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation Dialog */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
@@ -75,6 +75,119 @@ const revenueBreakdownData = [
   { date: "2026-02-25", category: "Education", completedBookings: 19, gross: 52800, discounts: 2100, refunds: 700, net: 50000, commission: 8250 },
 ];
 
+interface RevenueReport {
+  totalRevenue: number;
+  platformFees: number;
+  netToProviders: number;
+  transactionCount: number;
+}
+
+interface RevenueBreakdownRow {
+  date: string;
+  category: string;
+  completedBookings: number | string;
+  gross: number | null;
+  discounts: number | null;
+  refunds: number | null;
+  net: number | null;
+  commission: number | null;
+}
+
+const emptyRevenueReport: RevenueReport = {
+  totalRevenue: 0,
+  platformFees: 0,
+  netToProviders: 0,
+  transactionCount: 0,
+};
+
+function getApiBaseUrl(): string {
+  return import.meta.env.VITE_API_BASE_URL || "";
+}
+
+function getAdminToken(): string {
+  return localStorage.getItem("servease_admin_token")?.trim() ?? "";
+}
+
+function startOfUtcDay(date: Date): string {
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(), 0, 0, 0, 0)).toISOString();
+}
+
+function endOfUtcDay(date: Date): string {
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(), 23, 59, 59, 999)).toISOString();
+}
+
+function getDateRangeBounds(dateRange: string) {
+  const now = new Date();
+  const from = new Date(now);
+  const to = new Date(now);
+
+  if (dateRange === "last-7-days") {
+    from.setUTCDate(now.getUTCDate() - 6);
+  } else if (dateRange === "last-90-days") {
+    from.setUTCDate(now.getUTCDate() - 89);
+  } else if (dateRange === "all-time") {
+    from.setUTCFullYear(2020, 0, 1);
+  } else if (dateRange === "this-month") {
+    from.setUTCDate(1);
+  } else {
+    from.setUTCDate(now.getUTCDate() - 29);
+  }
+
+  return {
+    from: startOfUtcDay(from),
+    to: endOfUtcDay(to),
+  };
+}
+
+function getNumber(record: Record<string, unknown>, keys: string[]): number {
+  for (const key of keys) {
+    const value = record[key];
+    if (value != null && value !== "") {
+      const numberValue = Number(value);
+      return Number.isFinite(numberValue) ? numberValue : 0;
+    }
+  }
+  return 0;
+}
+
+function normalizeRevenueReport(response: unknown): RevenueReport {
+  const record = response && typeof response === "object" ? response as Record<string, unknown> : {};
+  const data = record.data && typeof record.data === "object" ? record.data as Record<string, unknown> : record;
+
+  return {
+    totalRevenue: getNumber(data, ["total_revenue", "totalRevenue"]),
+    platformFees: getNumber(data, ["platform_fees", "platformFees", "commission", "commissionEarned"]),
+    netToProviders: getNumber(data, ["net_to_providers", "netToProviders", "netProviderEarnings"]),
+    transactionCount: getNumber(data, ["transaction_count", "transactionCount", "completedBookings"]),
+  };
+}
+
+function formatCurrency(value: number | null): string {
+  if (value == null) {
+    return "N/A";
+  }
+
+  return `\u20b1${value.toLocaleString("en-PH", {
+    maximumFractionDigits: 0,
+  })}`;
+}
+
+function formatCompactCurrency(value: number | null): string {
+  if (value == null) {
+    return "N/A";
+  }
+
+  if (Math.abs(value) >= 1000000) {
+    return `\u20b1${(value / 1000000).toFixed(2)}M`;
+  }
+
+  if (Math.abs(value) >= 1000) {
+    return `\u20b1${(value / 1000).toFixed(0)}K`;
+  }
+
+  return formatCurrency(value);
+}
+
 // KPI Card Component
 function KPICard({ label, value, change, icon: Icon, changeType }: any) {
   return (
@@ -108,6 +221,89 @@ export function Revenue() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedItem, setSelectedItem] = useState<any>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [revenueReport, setRevenueReport] = useState<RevenueReport | null>(null);
+  const [isLoadingRevenue, setIsLoadingRevenue] = useState(true);
+  const [revenueError, setRevenueError] = useState("");
+
+  const fetchRevenueReport = useCallback(async () => {
+    const apiBaseUrl = getApiBaseUrl();
+    const { from, to } = getDateRangeBounds(dateRange);
+    const url = `${apiBaseUrl}/api/admin/v1/reports/revenue?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`;
+    const token = getAdminToken();
+
+    console.log("token", token);
+    if (!token) {
+      console.warn("Revenue report request skipped because admin token is missing.");
+      setRevenueReport(null);
+      setRevenueError("Revenue could not be loaded because admin login is required.");
+      setIsLoadingRevenue(false);
+      return;
+    }
+
+    setIsLoadingRevenue(true);
+    setRevenueError("");
+    try {
+      const response = await fetch(url, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch revenue report: ${response.status} ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      console.log("[revenue] raw response", data);
+      const normalized = normalizeRevenueReport(data);
+      console.log("[revenue] normalized report", normalized);
+      setRevenueReport(normalized);
+    } catch (error) {
+      console.warn("Revenue report could not be loaded.", error);
+      alert("Revenue report could not be loaded. Please try again.");
+      setRevenueReport(null);
+      setRevenueError("Revenue report could not be loaded. Please try again.");
+    } finally {
+      setIsLoadingRevenue(false);
+    }
+  }, [dateRange]);
+
+  useEffect(() => {
+    fetchRevenueReport();
+  }, [fetchRevenueReport]);
+
+  const currentReport = revenueReport ?? emptyRevenueReport;
+  const averageOrderValue = currentReport.transactionCount > 0
+    ? currentReport.totalRevenue / currentReport.transactionCount
+    : null;
+  const chartRevenueOverTimeData = useMemo(() => {
+    return [{ date: "Selected period", revenue: currentReport.totalRevenue }];
+  }, [currentReport.totalRevenue]);
+  const chartRevenueByCategoryData = useMemo(() => {
+    return [{ category: "N/A", revenue: currentReport.totalRevenue }];
+  }, [currentReport.totalRevenue]);
+  const visibleRevenueBreakdownData = useMemo<RevenueBreakdownRow[]>(() => {
+    return [{
+      date: "Selected period",
+      category: "N/A",
+      completedBookings: currentReport.transactionCount,
+      gross: currentReport.totalRevenue,
+      discounts: null,
+      refunds: null,
+      net: currentReport.netToProviders,
+      commission: currentReport.platformFees,
+    }];
+  }, [currentReport]);
+  const filteredRevenueBreakdownData = useMemo(() => {
+    const search = searchTerm.trim().toLowerCase();
+    if (!search) {
+      return visibleRevenueBreakdownData;
+    }
+
+    return visibleRevenueBreakdownData.filter((row) =>
+      Object.values(row).some((value) => String(value ?? "N/A").toLowerCase().includes(search))
+    );
+  }, [searchTerm, visibleRevenueBreakdownData]);
 
   const handleExportCSV = () => {
     alert("✅ Exporting Revenue data to CSV...");
@@ -147,6 +343,9 @@ export function Revenue() {
       {/* Global Filters */}
       <Card>
         <CardContent className="p-4">
+          {revenueError && (
+            <p className="text-sm text-red-600 mb-4">{revenueError}</p>
+          )}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="space-y-1.5">
               <Label className="text-[12px] font-medium text-gray-700">Date Range</Label>
@@ -157,7 +356,9 @@ export function Revenue() {
                 <SelectContent>
                   <SelectItem value="last-7-days">Last 7 Days</SelectItem>
                   <SelectItem value="last-30-days">Last 30 Days</SelectItem>
+                  <SelectItem value="last-90-days">Last 90 Days</SelectItem>
                   <SelectItem value="this-month">This Month</SelectItem>
+                  <SelectItem value="all-time">All Time</SelectItem>
                   <SelectItem value="custom">Custom Range</SelectItem>
                 </SelectContent>
               </Select>
@@ -218,12 +419,48 @@ export function Revenue() {
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
-        <KPICard label="Gross Revenue" value="₱2.41M" change="+12.5%" changeType="up" icon={DollarSign} />
-        <KPICard label="Net Revenue" value="₱2.02M" change="+10.8%" changeType="up" icon={TrendingUp} />
-        <KPICard label="Total Commission" value="₱396K" change="+11.2%" changeType="up" icon={DollarSign} />
-        <KPICard label="Refund Amount" value="₱55.1K" change="-8.2%" changeType="down" icon={TrendingUp} />
-        <KPICard label="Completed Bookings" value="2,326" change="+14.2%" changeType="up" icon={CheckCircle} />
-        <KPICard label="Average Order Value" value="₱1,037" change="+5.3%" changeType="up" icon={Package} />
+        <KPICard
+          label="Gross Revenue"
+          value={isLoadingRevenue ? "Loading..." : formatCompactCurrency(currentReport.totalRevenue)}
+          change={undefined}
+          changeType="up"
+          icon={DollarSign}
+        />
+        <KPICard
+          label="Net Revenue"
+          value={isLoadingRevenue ? "Loading..." : formatCompactCurrency(currentReport.netToProviders)}
+          change={undefined}
+          changeType="up"
+          icon={TrendingUp}
+        />
+        <KPICard
+          label="Total Commission"
+          value={isLoadingRevenue ? "Loading..." : formatCompactCurrency(currentReport.platformFees)}
+          change={undefined}
+          changeType="up"
+          icon={DollarSign}
+        />
+        <KPICard
+          label="Refund Amount"
+          value="N/A"
+          change={undefined}
+          changeType="down"
+          icon={TrendingUp}
+        />
+        <KPICard
+          label="Completed Bookings"
+          value={isLoadingRevenue ? "Loading..." : currentReport.transactionCount.toLocaleString()}
+          change={undefined}
+          changeType="up"
+          icon={CheckCircle}
+        />
+        <KPICard
+          label="Average Order Value"
+          value={isLoadingRevenue ? "Loading..." : formatCompactCurrency(averageOrderValue)}
+          change={undefined}
+          changeType="up"
+          icon={Package}
+        />
       </div>
 
       {/* Charts */}
@@ -234,11 +471,11 @@ export function Revenue() {
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={revenueOverTimeData}>
+              <LineChart data={chartRevenueOverTimeData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                 <XAxis dataKey="date" stroke="#6b7280" style={{ fontSize: 12 }} />
-                <YAxis stroke="#6b7280" tickFormatter={(value) => `₱${(value / 1000).toFixed(0)}K`} style={{ fontSize: 12 }} />
-                <Tooltip formatter={(value: number) => `₱${value.toLocaleString()}`} />
+                <YAxis stroke="#6b7280" tickFormatter={(value) => `\u20b1${(value / 1000).toFixed(0)}K`} style={{ fontSize: 12 }} />
+                <Tooltip formatter={(value: number) => formatCurrency(value)} />
                 <Line type="monotone" dataKey="revenue" stroke="#00BF63" strokeWidth={2} />
               </LineChart>
             </ResponsiveContainer>
@@ -251,11 +488,11 @@ export function Revenue() {
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={revenueByCategoryData}>
+              <BarChart data={chartRevenueByCategoryData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                 <XAxis dataKey="category" stroke="#6b7280" angle={-45} textAnchor="end" height={100} style={{ fontSize: 11 }} />
-                <YAxis stroke="#6b7280" tickFormatter={(value) => `₱${(value / 1000).toFixed(0)}K`} style={{ fontSize: 12 }} />
-                <Tooltip formatter={(value: number) => `₱${value.toLocaleString()}`} />
+                <YAxis stroke="#6b7280" tickFormatter={(value) => `\u20b1${(value / 1000).toFixed(0)}K`} style={{ fontSize: 12 }} />
+                <Tooltip formatter={() => "N/A"} />
                 <Bar dataKey="revenue" fill="#00BF63" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
@@ -297,16 +534,16 @@ export function Revenue() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {revenueBreakdownData.map((row, index) => (
+                {filteredRevenueBreakdownData.map((row, index) => (
                   <TableRow key={index} className="hover:bg-gray-50">
                     <TableCell className="text-[14px]">{row.date}</TableCell>
                     <TableCell className="text-[14px]">{row.category}</TableCell>
                     <TableCell className="text-[14px] text-right">{row.completedBookings}</TableCell>
-                    <TableCell className="text-[14px] text-right">₱{row.gross.toLocaleString()}</TableCell>
-                    <TableCell className="text-[14px] text-right text-orange-600">-₱{row.discounts.toLocaleString()}</TableCell>
-                    <TableCell className="text-[14px] text-right text-red-600">-₱{row.refunds.toLocaleString()}</TableCell>
-                    <TableCell className="text-[14px] text-right font-semibold">₱{row.net.toLocaleString()}</TableCell>
-                    <TableCell className="text-[14px] text-right text-[#00BF63] font-semibold">₱{row.commission.toLocaleString()}</TableCell>
+                    <TableCell className="text-[14px] text-right">{formatCurrency(row.gross)}</TableCell>
+                    <TableCell className="text-[14px] text-right text-orange-600">{row.discounts == null ? "N/A" : `-\u20b1${row.discounts.toLocaleString()}`}</TableCell>
+                    <TableCell className="text-[14px] text-right text-red-600">{row.refunds == null ? "N/A" : `-\u20b1${row.refunds.toLocaleString()}`}</TableCell>
+                    <TableCell className="text-[14px] text-right font-semibold">{formatCurrency(row.net)}</TableCell>
+                    <TableCell className="text-[14px] text-right text-[#00BF63] font-semibold">{formatCurrency(row.commission)}</TableCell>
                     <TableCell className="text-right">
                       <Button variant="ghost" size="sm" onClick={() => openDrawer(row)}>
                         <Eye className="w-4 h-4" />
@@ -320,7 +557,7 @@ export function Revenue() {
 
           {/* Mobile Cards */}
           <div className="sm:hidden space-y-3">
-            {revenueBreakdownData.map((row, index) => (
+            {filteredRevenueBreakdownData.map((row, index) => (
               <Card key={index} className="p-4">
                 <div className="space-y-2">
                   <div className="flex justify-between items-start">
@@ -333,19 +570,19 @@ export function Revenue() {
                   <div className="grid grid-cols-2 gap-2 text-[13px]">
                     <div>
                       <span className="text-gray-500">Gross:</span>
-                      <span className="ml-1 font-medium">₱{row.gross.toLocaleString()}</span>
+                      <span className="ml-1 font-medium">{formatCurrency(row.gross)}</span>
                     </div>
                     <div>
                       <span className="text-gray-500">Net:</span>
-                      <span className="ml-1 font-medium">₱{row.net.toLocaleString()}</span>
+                      <span className="ml-1 font-medium">{formatCurrency(row.net)}</span>
                     </div>
                     <div>
                       <span className="text-gray-500">Discounts:</span>
-                      <span className="ml-1 text-orange-600">-₱{row.discounts.toLocaleString()}</span>
+                      <span className="ml-1 text-orange-600">{row.discounts == null ? "N/A" : `-\u20b1${row.discounts.toLocaleString()}`}</span>
                     </div>
                     <div>
                       <span className="text-gray-500">Commission:</span>
-                      <span className="ml-1 text-[#00BF63] font-medium">₱{row.commission.toLocaleString()}</span>
+                      <span className="ml-1 text-[#00BF63] font-medium">{formatCurrency(row.commission)}</span>
                     </div>
                   </div>
                   <Button variant="outline" size="sm" className="w-full text-[14px] font-medium" onClick={() => openDrawer(row)}>

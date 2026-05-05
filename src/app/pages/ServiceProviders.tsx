@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
@@ -18,7 +18,7 @@ import {
   TableHeader,
   TableRow,
 } from "../components/ui/table";
-import { Search, Star, TrendingUp, Users, CheckCircle, AlertCircle, Upload, Download, FileText } from "lucide-react";
+import { Search, Star, TrendingUp, Users, CheckCircle, AlertCircle, Upload, Download, FileText, Loader2 } from "lucide-react";
 import { useNavigate } from "react-router";
 import { useData } from "../../contexts/DataContext";
 import type { ProviderStatus, ServiceProvider } from "../../types";
@@ -27,7 +27,14 @@ import { CSVUploadModal } from "../components/CSVUploadModal";
 import { toast } from "sonner";
 
 export function ServiceProviders() {
-  const { serviceProviders, getCategoryById, updateProviderStatus } = useData();
+  const {
+    serviceProviders,
+    isLoadingServiceProviders,
+    fetchServiceProviders,
+    fetchServiceCategories,
+    getCategoryById,
+    updateProviderStatus,
+  } = useData();
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
@@ -36,24 +43,38 @@ export function ServiceProviders() {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
 
+  useEffect(() => {
+    void fetchServiceProviders();
+    void fetchServiceCategories();
+  }, [fetchServiceProviders, fetchServiceCategories]);
+
   const filteredProviders = useMemo(() => {
     return serviceProviders.filter((provider) => {
-      const category = getCategoryById(provider.categoryId);
       const matchesSearch =
         provider.businessName.toLowerCase().includes(searchTerm.toLowerCase()) ||
         provider.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
         provider.contactPerson.toLowerCase().includes(searchTerm.toLowerCase());
 
-      const matchesCategory = categoryFilter === "all" || provider.categoryId === categoryFilter;
+      const matchesCategory =
+        categoryFilter === "all" ||
+        provider.categoryId === categoryFilter ||
+        provider.categoryName === categoryFilter;
       const matchesStatus = statusFilter === "all" || provider.status === statusFilter;
 
       return matchesSearch && matchesCategory && matchesStatus;
     });
-  }, [serviceProviders, searchTerm, categoryFilter, statusFilter, getCategoryById]);
+  }, [serviceProviders, searchTerm, categoryFilter, statusFilter]);
+
+  const getProviderCategoryName = (provider: ServiceProvider) =>
+    provider.categoryName || getCategoryById(provider.categoryId)?.name || "N/A";
 
   const stats = useMemo(() => {
-    const avgRating = serviceProviders.reduce((sum, p) => sum + p.rating, 0) / serviceProviders.length;
-    const avgCompletionRate = serviceProviders.reduce((sum, p) => sum + p.completionRate, 0) / serviceProviders.length;
+    const avgRating = serviceProviders.length > 0
+      ? serviceProviders.reduce((sum, p) => sum + p.rating, 0) / serviceProviders.length
+      : 0;
+    const avgCompletionRate = serviceProviders.length > 0
+      ? serviceProviders.reduce((sum, p) => sum + p.completionRate, 0) / serviceProviders.length
+      : 0;
     const totalBookings = serviceProviders.reduce((sum, p) => sum + p.totalBookings, 0);
 
     return [
@@ -129,7 +150,7 @@ export function ServiceProviders() {
   };
 
   const handleToggleStatus = (providerId: string, newStatus: ProviderStatus) => {
-    updateProviderStatus(providerId, newStatus);
+    void updateProviderStatus(providerId, newStatus);
   };
 
   const handleOpenUploadModal = () => {
@@ -181,7 +202,7 @@ export function ServiceProviders() {
       const rows = filteredProviders.map((provider) => [
         provider.id,
         provider.businessName,
-        getCategoryById(provider.categoryId)?.name || "N/A",
+        getProviderCategoryName(provider),
         provider.contactPerson,
         provider.email,
         provider.phone,
@@ -358,7 +379,16 @@ export function ServiceProviders() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredProviders.length === 0 ? (
+                {isLoadingServiceProviders ? (
+                  <TableRow>
+                    <TableCell colSpan={10} className="text-center py-8 text-gray-500">
+                      <div className="flex items-center justify-center gap-2">
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Loading service providers...
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ) : filteredProviders.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={10} className="text-center py-8 text-gray-500">
                       No service providers found
@@ -379,7 +409,7 @@ export function ServiceProviders() {
                       </TableCell>
                       <TableCell>
                         <span className="text-sm text-gray-600">
-                          {getCategoryById(provider.categoryId)?.name || "N/A"}
+                          {getProviderCategoryName(provider)}
                         </span>
                       </TableCell>
                       <TableCell>
@@ -443,7 +473,7 @@ export function ServiceProviders() {
         onClose={handleCloseDrawer}
         categoryName={
           selectedProvider
-            ? getCategoryById(selectedProvider.categoryId)?.name || "N/A"
+            ? getProviderCategoryName(selectedProvider)
             : ""
         }
         onToggleStatus={handleToggleStatus}
