@@ -1,5 +1,7 @@
-import { Shield, Bell, FileText, Users, CheckCircle, Clock, MoreVertical, RefreshCw, Copy, Check, Eye, UserX, Lock, Settings, Edit2, UserCheck, Key, Search, Download, Filter, Plug, Wifi, WifiOff, ExternalLink, CreditCard, MapPin, BarChart3 } from "lucide-react";
-import { useState } from "react";
+import { Shield, Bell, FileText, Users, CheckCircle, Clock, MoreVertical, RefreshCw, Copy, Check, Eye, UserX, Lock, Settings, Edit2, UserCheck, Key, Search, Download, Filter, Plug, Wifi, WifiOff, ExternalLink, CreditCard, MapPin, BarChart3, AlertCircle } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Skeleton } from "../components/ui/skeleton";
+import { useApi, apiCall } from "../../hooks/useApi";
 import { AdminRolesComponent } from "../components/AdminRolesComponent";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Badge } from "../components/ui/badge";
@@ -49,12 +51,68 @@ export function AdminRoles() {
 
 // Notification Settings
 export function NotificationSettings() {
+  const { data, isLoading, error } = useApi<any>("/api/admin/v1/settings/notifications");
+
   const [emailNotifications, setEmailNotifications] = useState(true);
   const [smsNotifications, setSmsNotifications] = useState(false);
   const [pushNotifications, setPushNotifications] = useState(true);
   const [bookingAlerts, setBookingAlerts] = useState(true);
   const [paymentAlerts, setPaymentAlerts] = useState(true);
   const [disputeAlerts, setDisputeAlerts] = useState(true);
+
+  useEffect(() => {
+    if (data) {
+      setEmailNotifications(data.emailNotifications ?? true);
+      setSmsNotifications(data.smsNotifications ?? false);
+      setPushNotifications(data.pushNotifications ?? true);
+      setBookingAlerts(data.bookingAlerts ?? true);
+      setPaymentAlerts(data.paymentAlerts ?? true);
+      setDisputeAlerts(data.disputeAlerts ?? true);
+    }
+  }, [data]);
+
+  const handleSave = async () => {
+    try {
+      await apiCall("/api/admin/v1/settings/notifications", {
+        method: "PUT",
+        body: JSON.stringify({
+          emailNotifications,
+          smsNotifications,
+          pushNotifications,
+          bookingAlerts,
+          paymentAlerts,
+          disputeAlerts,
+        }),
+      });
+      toast.success("Notification settings saved successfully", {
+        className: "bg-[#00BF63] text-white border-none"
+      });
+    } catch (err: any) {
+      toast.error("Failed to save settings", { description: err.message });
+    }
+  };
+
+  if (error) {
+    return (
+      <Card className="border-red-200 bg-red-50">
+        <CardContent className="p-6 flex flex-col items-center justify-center text-center space-y-2">
+          <AlertCircle className="w-8 h-8 text-red-500" />
+          <p className="text-red-700 font-medium">Failed to load notification settings</p>
+          <p className="text-sm text-red-600">{error}</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <Skeleton className="h-8 w-64 mb-2" />
+        <Skeleton className="h-[200px] w-full" />
+        <Skeleton className="h-[200px] w-full" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -165,7 +223,7 @@ export function NotificationSettings() {
 
       {/* Save Button */}
       <div className="flex justify-end">
-        <Button className="bg-[#00BF63] hover:bg-[#00A055]">
+        <Button onClick={handleSave} className="bg-[#00BF63] hover:bg-[#00A055]">
           Save Settings
         </Button>
       </div>
@@ -175,9 +233,62 @@ export function NotificationSettings() {
 
 // Security Settings
 export function SecuritySettings() {
+  const { data, isLoading, error } = useApi<any>("/api/admin/v1/settings/security");
+
   const [twoFactorAuth, setTwoFactorAuth] = useState(false);
   const [sessionTimeout, setSessionTimeout] = useState("30");
   const [ipWhitelisting, setIpWhitelisting] = useState(false);
+  const [ipAddresses, setIpAddresses] = useState("");
+
+  useEffect(() => {
+    if (data) {
+      setTwoFactorAuth(data.twoFactorAuth ?? false);
+      setSessionTimeout(data.sessionTimeout?.toString() ?? "30");
+      setIpWhitelisting(data.ipWhitelisting ?? false);
+      setIpAddresses(data.ipAddresses ?? "");
+    }
+  }, [data]);
+
+  const handleSave = async () => {
+    try {
+      await apiCall("/api/admin/v1/settings/security", {
+        method: "PUT",
+        body: JSON.stringify({
+          twoFactorAuth,
+          sessionTimeout: parseInt(sessionTimeout, 10),
+          ipWhitelisting,
+          ipAddresses,
+        }),
+      });
+      toast.success("Security settings saved successfully", {
+        className: "bg-[#00BF63] text-white border-none"
+      });
+    } catch (err: any) {
+      toast.error("Failed to save settings", { description: err.message });
+    }
+  };
+
+  if (error) {
+    return (
+      <Card className="border-red-200 bg-red-50">
+        <CardContent className="p-6 flex flex-col items-center justify-center text-center space-y-2">
+          <AlertCircle className="w-8 h-8 text-red-500" />
+          <p className="text-red-700 font-medium">Failed to load security settings</p>
+          <p className="text-sm text-red-600">{error}</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <Skeleton className="h-8 w-64 mb-2" />
+        <Skeleton className="h-[200px] w-full" />
+        <Skeleton className="h-[200px] w-full" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -252,6 +363,8 @@ export function SecuritySettings() {
               <Input
                 id="ipAddresses"
                 placeholder="e.g., 192.168.1.1, 192.168.1.2"
+                value={ipAddresses}
+                onChange={(e) => setIpAddresses(e.target.value)}
               />
               <p className="text-xs text-gray-500">
                 Enter comma-separated IP addresses
@@ -263,7 +376,7 @@ export function SecuritySettings() {
 
       {/* Save Button */}
       <div className="flex justify-end">
-        <Button className="bg-[#00BF63] hover:bg-[#00A055]">
+        <Button onClick={handleSave} className="bg-[#00BF63] hover:bg-[#00A055]">
           Save Security Settings
         </Button>
       </div>
@@ -278,114 +391,26 @@ export function AuditTrail() {
   const [selectedActionType, setSelectedActionType] = useState("all");
   const [selectedEntityType, setSelectedEntityType] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const [page, setPage] = useState(1);
+  const pageSize = 10;
 
-  const auditLogs = [
-    {
-      id: "LOG-001",
-      timestamp: "2026-03-04T14:30:00",
-      adminUser: "Juan Dela Cruz",
-      action: "Created new admin user",
-      entity: "Admin User",
-      details: "Created admin: Maria Santos (Finance Admin)",
-      ipAddress: "192.168.1.100",
-    },
-    {
-      id: "LOG-002",
-      timestamp: "2026-03-04T13:15:00",
-      adminUser: "Juan Dela Cruz",
-      action: "Updated service provider",
-      entity: "Service Provider",
-      details: "Approved KYC for provider ID: PRV-1234",
-      ipAddress: "192.168.1.100",
-    },
-    {
-      id: "LOG-003",
-      timestamp: "2026-03-04T12:00:00",
-      adminUser: "Maria Santos",
-      action: "Processed payout",
-      entity: "Payout",
-      details: "Approved payout of ₱15,000.00 to PRV-1234",
-      ipAddress: "192.168.1.101",
-    },
-    {
-      id: "LOG-004",
-      timestamp: "2026-03-04T10:45:00",
-      adminUser: "Roberto Garcia",
-      action: "Resolved dispute",
-      entity: "Dispute",
-      details: "Marked dispute DSP-5678 as resolved",
-      ipAddress: "192.168.1.102",
-    },
-    {
-      id: "LOG-005",
-      timestamp: "2026-03-04T09:30:00",
-      adminUser: "Juan Dela Cruz",
-      action: "Updated platform settings",
-      entity: "Settings",
-      details: "Modified notification settings",
-      ipAddress: "192.168.1.100",
-    },
-    {
-      id: "LOG-006",
-      timestamp: "2026-03-04T08:15:00",
-      adminUser: "Maria Santos",
-      action: "Approved booking",
-      entity: "Booking",
-      details: "Approved booking BK-2024-156",
-      ipAddress: "192.168.1.101",
-    },
-    {
-      id: "LOG-007",
-      timestamp: "2026-03-04T07:00:00",
-      adminUser: "Roberto Garcia",
-      action: "Created promotion",
-      entity: "Promotion",
-      details: "Created summer promo code: SUMMER2026",
-      ipAddress: "192.168.1.102",
-    },
-  ];
+  const queryParams = new URLSearchParams();
+  queryParams.append("page", page.toString());
+  queryParams.append("limit", pageSize.toString());
+  if (searchQuery) queryParams.append("search", searchQuery);
+  if (selectedDateRange !== "all") queryParams.append("dateRange", selectedDateRange);
+  if (selectedAdminUser !== "all") queryParams.append("adminUser", selectedAdminUser);
+  if (selectedActionType !== "all") queryParams.append("actionType", selectedActionType);
+  if (selectedEntityType !== "all") queryParams.append("entityType", selectedEntityType);
 
-  // Filter audit logs based on filters and search
-  const filteredLogs = auditLogs.filter((log) => {
-    // Filter by admin user
-    if (selectedAdminUser !== "all" && log.adminUser !== selectedAdminUser) {
-      return false;
-    }
+  const { data, isLoading, error } = useApi<any>(`/api/admin/v1/audit-trail?${queryParams.toString()}`);
 
-    // Filter by action type
-    if (selectedActionType !== "all") {
-      const actionLower = log.action.toLowerCase();
-      if (
-        (selectedActionType === "create" && !actionLower.includes("created")) ||
-        (selectedActionType === "update" && !actionLower.includes("updated") && !actionLower.includes("modified")) ||
-        (selectedActionType === "delete" && !actionLower.includes("deleted")) ||
-        (selectedActionType === "approve" && !actionLower.includes("approved")) ||
-        (selectedActionType === "resolve" && !actionLower.includes("resolved"))
-      ) {
-        return false;
-      }
-    }
+  const auditLogs = data?.logs || [];
+  const totalLogs = data?.total || 0;
+  const stats = data?.stats || { totalToday: 0, activeAdmins: 0 };
 
-    // Filter by entity type
-    if (selectedEntityType !== "all" && log.entity !== selectedEntityType) {
-      return false;
-    }
-
-    // Search filter
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      return (
-        log.id.toLowerCase().includes(query) ||
-        log.adminUser.toLowerCase().includes(query) ||
-        log.action.toLowerCase().includes(query) ||
-        log.entity.toLowerCase().includes(query) ||
-        log.details.toLowerCase().includes(query) ||
-        log.ipAddress.includes(query)
-      );
-    }
-
-    return true;
-  });
+  // Filtering is now handled by the backend
+  const filteredLogs = auditLogs;
 
   const handleExportLogs = () => {
     toast.success("Audit logs exported successfully");
@@ -411,8 +436,11 @@ export function AuditTrail() {
               </div>
               <div className="flex-1">
                 <p className="text-sm text-gray-500">Total Actions Today</p>
-                <p className="text-2xl font-bold text-gray-900 mt-1">42</p>
-                <p className="text-xs text-gray-400 mt-1">+12% from yesterday</p>
+                {isLoading ? (
+                  <Skeleton className="h-8 w-16 mt-1" />
+                ) : (
+                  <p className="text-2xl font-bold text-gray-900 mt-1">{stats.totalToday || 0}</p>
+                )}
               </div>
             </div>
           </CardContent>
@@ -426,8 +454,11 @@ export function AuditTrail() {
               </div>
               <div className="flex-1">
                 <p className="text-sm text-gray-500">Active Admin Users</p>
-                <p className="text-2xl font-bold text-gray-900 mt-1">8</p>
-                <p className="text-xs text-gray-400 mt-1">Currently online</p>
+                {isLoading ? (
+                  <Skeleton className="h-8 w-16 mt-1" />
+                ) : (
+                  <p className="text-2xl font-bold text-gray-900 mt-1">{stats.activeAdmins || 0}</p>
+                )}
               </div>
             </div>
           </CardContent>
@@ -441,8 +472,8 @@ export function AuditTrail() {
               </div>
               <div className="flex-1">
                 <p className="text-sm text-gray-500">Recent Activity</p>
-                <p className="text-2xl font-bold text-gray-900 mt-1">5 min</p>
-                <p className="text-xs text-gray-400 mt-1">Last action</p>
+                <p className="text-2xl font-bold text-gray-900 mt-1">Live</p>
+                <p className="text-xs text-gray-400 mt-1">Tracking enabled</p>
               </div>
             </div>
           </CardContent>
@@ -491,6 +522,7 @@ export function AuditTrail() {
                   <SelectValue placeholder="Select date range" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="all">All Time</SelectItem>
                   <SelectItem value="today">Today</SelectItem>
                   <SelectItem value="yesterday">Yesterday</SelectItem>
                   <SelectItem value="last7days">Last 7 Days</SelectItem>
@@ -557,11 +589,31 @@ export function AuditTrail() {
           </div>
 
           {/* Results Count */}
-          <div className="mt-4 pt-4 border-t">
+          <div className="mt-4 pt-4 border-t flex justify-between items-center">
             <p className="text-sm text-gray-600">
               Showing <span className="font-semibold text-gray-900">{filteredLogs.length}</span> of{" "}
-              <span className="font-semibold text-gray-900">{auditLogs.length}</span> logs
+              <span className="font-semibold text-gray-900">{totalLogs}</span> logs
             </p>
+            {/* Pagination Controls */}
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page === 1 || isLoading}
+              >
+                Previous
+              </Button>
+              <span className="text-sm text-gray-600 font-medium">Page {page}</span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage((p) => p + 1)}
+                disabled={filteredLogs.length < pageSize || isLoading}
+              >
+                Next
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -585,7 +637,33 @@ export function AuditTrail() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredLogs.map((log) => (
+              {isLoading ? (
+                Array.from({ length: 5 }).map((_, index) => (
+                  <TableRow key={index}>
+                    <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+                    <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+                    <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+                    <TableCell><Skeleton className="h-6 w-24 rounded-full" /></TableCell>
+                    <TableCell><Skeleton className="h-6 w-24 rounded-full" /></TableCell>
+                    <TableCell><Skeleton className="h-4 w-48" /></TableCell>
+                    <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                  </TableRow>
+                ))
+              ) : filteredLogs.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={7} className="text-center py-8">
+                    {error ? (
+                      <div className="flex flex-col items-center justify-center text-red-500">
+                        <AlertCircle className="w-8 h-8 mb-2" />
+                        <p>{error}</p>
+                      </div>
+                    ) : (
+                      <p className="text-gray-500">No audit logs found matching your criteria.</p>
+                    )}
+                  </TableCell>
+                </TableRow>
+              ) : (
+                filteredLogs.map((log: any) => (
                 <TableRow key={log.id}>
                   <TableCell>
                     <span className="font-mono font-semibold text-[#00BF63]">{log.id}</span>
@@ -620,15 +698,29 @@ export function AuditTrail() {
                     <span className="font-mono text-xs text-gray-600">{log.ipAddress}</span>
                   </TableCell>
                 </TableRow>
-              ))}
+              )))}
             </TableBody>
           </Table>
         </CardContent>
       </Card>
 
-      {/* Audit Log Table - Mobile Cards */}
       <div className="md:hidden space-y-4">
-        {filteredLogs.map((log) => (
+        {isLoading ? (
+           Array.from({ length: 3 }).map((_, index) => (
+             <Card key={index}>
+               <CardContent className="p-4">
+                 <Skeleton className="h-20 w-full" />
+               </CardContent>
+             </Card>
+           ))
+        ) : filteredLogs.length === 0 ? (
+          <Card>
+            <CardContent className="p-8 text-center text-gray-500">
+              No audit logs found.
+            </CardContent>
+          </Card>
+        ) : (
+          filteredLogs.map((log: any) => (
           <Card key={log.id}>
             <CardContent className="p-4">
               <div className="flex items-start justify-between mb-3">
@@ -657,7 +749,7 @@ export function AuditTrail() {
               </div>
             </CardContent>
           </Card>
-        ))}
+        )))}
       </div>
     </div>
   );
@@ -665,22 +757,153 @@ export function AuditTrail() {
 
 // Integrations
 export function Integrations() {
-  const [gcashEnabled, setGcashEnabled] = useState(true);
-  const [paymayaEnabled, setPaymayaEnabled] = useState(true);
-  const [stripeEnabled, setStripeEnabled] = useState(false);
-  const [twilioEnabled, setTwilioEnabled] = useState(true);
-  const [sendgridEnabled, setSendgridEnabled] = useState(true);
-  const [googleMapsEnabled, setGoogleMapsEnabled] = useState(true);
-  const [mixpanelEnabled, setMixpanelEnabled] = useState(false);
-  const [firebaseEnabled, setFirebaseEnabled] = useState(true);
+  const { data, isLoading, error } = useApi<any>("/api/admin/v1/settings/integrations");
+  const storageKey = "servease_integrations";
 
-  const handleTestIntegration = (service: string) => {
-    toast.success(`${service} integration test successful`);
+  const defaultIntegrations = {
+    gcash: { enabled: true, connected: true },
+    paymaya: { enabled: true, connected: true },
+    stripe: { enabled: false, connected: false },
+    twilio: { enabled: true, connected: true },
+    sendgrid: { enabled: true, connected: true },
+    googleMaps: { enabled: true, connected: true },
+    mixpanel: { enabled: false, connected: false },
+    firebase: { enabled: true, connected: true },
   };
 
-  const handleUpdateCredentials = (service: string) => {
-    toast.success(`${service} credentials updated successfully`);
+  const [localIntegrations, setLocalIntegrations] = useState<any>(null);
+
+  const readStoredIntegrations = () => {
+    try {
+      const raw = localStorage.getItem(storageKey);
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
   };
+
+  const writeStoredIntegrations = (next: any) => {
+    try {
+      localStorage.setItem(storageKey, JSON.stringify(next));
+    } catch {
+      // Ignore storage failures (e.g., private mode)
+    }
+  };
+
+  useEffect(() => {
+    const stored = readStoredIntegrations();
+    if (stored) {
+      setLocalIntegrations(stored);
+    }
+  }, []);
+
+  useEffect(() => {
+    const stored = readStoredIntegrations();
+    if (data && !stored) {
+      setLocalIntegrations(data);
+    }
+  }, [data]);
+
+  const integrations = localIntegrations || data || defaultIntegrations;
+
+  const integrationEndpointKeys: Record<string, string> = {
+    gcash: "gcash",
+    paymaya: "paymaya",
+    stripe: "stripe",
+    twilio: "twilio",
+    sendgrid: "sendgrid",
+    googleMaps: "google-maps",
+    mixpanel: "mixpanel",
+    firebase: "firebase",
+  };
+
+  const integrationLabels: Record<string, string> = {
+    gcash: "GCash",
+    paymaya: "PayMaya",
+    stripe: "Stripe",
+    twilio: "Twilio",
+    sendgrid: "SendGrid",
+    googleMaps: "Google Maps",
+    mixpanel: "Mixpanel",
+    firebase: "Firebase",
+  };
+
+  const getIntegrationEndpointKey = (service: string) =>
+    integrationEndpointKeys[service] ?? service;
+
+  const getIntegrationLabel = (service: string) =>
+    integrationLabels[service] ?? service;
+
+  const handleTestIntegration = async (service: string) => {
+    const endpointKey = getIntegrationEndpointKey(service);
+    const label = getIntegrationLabel(service);
+    try {
+      await apiCall(`/api/admin/v1/settings/integrations/${endpointKey}/test`, {
+        method: "POST",
+      });
+      toast.success(`${label} integration test successful`);
+    } catch (err: any) {
+      toast.error(`Failed to test ${label}`, { description: err.message });
+    }
+  };
+
+  const handleUpdateCredentials = async (service: string) => {
+    const label = getIntegrationLabel(service);
+    toast.success(`${label} credentials update initiated...`);
+  };
+
+  const handleToggle = async (service: string, currentState: boolean) => {
+    const endpointKey = getIntegrationEndpointKey(service);
+    // Optimistic update — flip immediately, no refetch, no success toast
+    setLocalIntegrations((prev: any) => ({
+      ...(prev || integrations),
+      [service]: { ...(prev?.[service] || integrations[service]), enabled: !currentState },
+    }));
+
+    try {
+      await apiCall(`/api/admin/v1/settings/integrations/${endpointKey}/toggle`, {
+        method: "PUT",
+        body: JSON.stringify({ enabled: !currentState }),
+      });
+      const nextState = {
+        ...(localIntegrations || integrations),
+        [service]: {
+          ...(localIntegrations?.[service] || integrations[service]),
+          enabled: !currentState,
+        },
+      };
+      writeStoredIntegrations(nextState);
+    } catch (err: any) {
+      // Revert on failure
+      setLocalIntegrations((prev: any) => ({
+        ...(prev || integrations),
+        [service]: { ...(prev?.[service] || integrations[service]), enabled: currentState },
+      }));
+      toast.error(`Failed to toggle ${service}`, { description: err.message });
+    }
+  };
+
+  if (error) {
+    return (
+      <Card className="border-red-200 bg-red-50">
+        <CardContent className="p-6 flex flex-col items-center justify-center text-center space-y-2">
+          <AlertCircle className="w-8 h-8 text-red-500" />
+          <p className="text-red-700 font-medium">Failed to load integrations</p>
+          <p className="text-sm text-red-600">{error}</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <Skeleton className="h-8 w-64 mb-2" />
+        <Skeleton className="h-[200px] w-full" />
+        <Skeleton className="h-[200px] w-full" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -751,7 +974,7 @@ export function Integrations() {
         <CardContent className="space-y-4">
           {/* GCash */}
           <div className="p-4 border rounded-lg">
-            <div className="flex items-start justify-between">
+            <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-12 h-12 rounded-lg bg-blue-600 flex items-center justify-center">
                   <CreditCard className="w-6 h-6 text-white" />
@@ -761,10 +984,16 @@ export function Integrations() {
                   <p className="text-sm text-gray-500">Philippine mobile wallet payment</p>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
-                <Settings className="w-4 h-4 text-gray-400" />
-                <Badge className={gcashEnabled ? "bg-green-100 text-green-700 border-green-200" : "bg-gray-100 text-gray-700 border-gray-200"}>
-                  {gcashEnabled ? (
+              <div className="flex items-center gap-3">
+                <Badge
+                  variant={integrations.gcash?.enabled ? "default" : "secondary"}
+                  className={
+                    integrations.gcash?.enabled
+                      ? "bg-[#DCFCE7] text-[#15803D] border-[#BBF7D0]"
+                      : "bg-gray-100 text-gray-700 border-gray-200"
+                  }
+                >
+                  {integrations.gcash?.enabled ? (
                     <>
                       <Wifi className="w-3 h-3 mr-1" />
                       Active
@@ -776,19 +1005,23 @@ export function Integrations() {
                     </>
                   )}
                 </Badge>
+                <Switch
+                  checked={integrations.gcash?.enabled}
+                  onCheckedChange={() => handleToggle("gcash", integrations.gcash?.enabled)}
+                />
               </div>
             </div>
             <div className="flex gap-2 mt-4">
-              <Button
+                <Button
                 variant="outline"
-                onClick={() => handleTestIntegration("GCash")}
+                  onClick={() => handleTestIntegration("gcash")}
                 className="flex-1"
               >
                 <ExternalLink className="w-4 h-4 mr-2" />
                 Test Integration
               </Button>
-              <Button
-                onClick={() => handleUpdateCredentials("GCash")}
+                <Button
+                  onClick={() => handleUpdateCredentials("gcash")}
                 className="flex-1 bg-[#00BF63] hover:bg-[#00A055]"
               >
                 <RefreshCw className="w-4 h-4 mr-2" />
@@ -799,7 +1032,7 @@ export function Integrations() {
 
           {/* PayMaya */}
           <div className="p-4 border rounded-lg">
-            <div className="flex items-start justify-between">
+            <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-12 h-12 rounded-lg bg-green-600 flex items-center justify-center">
                   <CreditCard className="w-6 h-6 text-white" />
@@ -809,10 +1042,16 @@ export function Integrations() {
                   <p className="text-sm text-gray-500">Digital payment solution for Philippines</p>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
-                <Settings className="w-4 h-4 text-gray-400" />
-                <Badge className={paymayaEnabled ? "bg-green-100 text-green-700 border-green-200" : "bg-gray-100 text-gray-700 border-gray-200"}>
-                  {paymayaEnabled ? (
+              <div className="flex items-center gap-3">
+                <Badge
+                  variant={integrations.paymaya?.enabled ? "default" : "secondary"}
+                  className={
+                    integrations.paymaya?.enabled
+                      ? "bg-[#DCFCE7] text-[#15803D] border-[#BBF7D0]"
+                      : "bg-gray-100 text-gray-700 border-gray-200"
+                  }
+                >
+                  {integrations.paymaya?.enabled ? (
                     <>
                       <Wifi className="w-3 h-3 mr-1" />
                       Active
@@ -824,19 +1063,23 @@ export function Integrations() {
                     </>
                   )}
                 </Badge>
+                <Switch
+                  checked={integrations.paymaya?.enabled}
+                  onCheckedChange={() => handleToggle("paymaya", integrations.paymaya?.enabled)}
+                />
               </div>
             </div>
             <div className="flex gap-2 mt-4">
-              <Button
+                <Button
                 variant="outline"
-                onClick={() => handleTestIntegration("PayMaya")}
+                  onClick={() => handleTestIntegration("paymaya")}
                 className="flex-1"
               >
                 <ExternalLink className="w-4 h-4 mr-2" />
                 Test Integration
               </Button>
-              <Button
-                onClick={() => handleUpdateCredentials("PayMaya")}
+                <Button
+                  onClick={() => handleUpdateCredentials("paymaya")}
                 className="flex-1 bg-[#00BF63] hover:bg-[#00A055]"
               >
                 <RefreshCw className="w-4 h-4 mr-2" />
@@ -847,7 +1090,7 @@ export function Integrations() {
 
           {/* Stripe */}
           <div className="p-4 border rounded-lg">
-            <div className="flex items-start justify-between">
+            <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-12 h-12 rounded-lg bg-purple-600 flex items-center justify-center">
                   <CreditCard className="w-6 h-6 text-white" />
@@ -857,10 +1100,16 @@ export function Integrations() {
                   <p className="text-sm text-gray-500">International payment processing</p>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
-                <Settings className="w-4 h-4 text-gray-400" />
-                <Badge className={stripeEnabled ? "bg-green-100 text-green-700 border-green-200" : "bg-gray-100 text-gray-700 border-gray-200"}>
-                  {stripeEnabled ? (
+              <div className="flex items-center gap-3">
+                <Badge
+                  variant={integrations.stripe?.enabled ? "default" : "secondary"}
+                  className={
+                    integrations.stripe?.enabled
+                      ? "bg-[#DCFCE7] text-[#15803D] border-[#BBF7D0]"
+                      : "bg-gray-100 text-gray-700 border-gray-200"
+                  }
+                >
+                  {integrations.stripe?.enabled ? (
                     <>
                       <Wifi className="w-3 h-3 mr-1" />
                       Active
@@ -872,19 +1121,23 @@ export function Integrations() {
                     </>
                   )}
                 </Badge>
+                <Switch
+                  checked={integrations.stripe?.enabled}
+                  onCheckedChange={() => handleToggle("stripe", integrations.stripe?.enabled)}
+                />
               </div>
             </div>
             <div className="flex gap-2 mt-4">
-              <Button
+                <Button
                 variant="outline"
-                onClick={() => handleTestIntegration("Stripe")}
+                  onClick={() => handleTestIntegration("stripe")}
                 className="flex-1"
               >
                 <ExternalLink className="w-4 h-4 mr-2" />
                 Test Integration
               </Button>
-              <Button
-                onClick={() => handleUpdateCredentials("Stripe")}
+                <Button
+                  onClick={() => handleUpdateCredentials("stripe")}
                 className="flex-1 bg-[#00BF63] hover:bg-[#00A055]"
               >
                 <RefreshCw className="w-4 h-4 mr-2" />
@@ -906,7 +1159,7 @@ export function Integrations() {
         <CardContent>
           {/* Twilio */}
           <div className="p-4 border rounded-lg">
-            <div className="flex items-start justify-between">
+            <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-12 h-12 rounded-lg bg-red-600 flex items-center justify-center">
                   <Bell className="w-6 h-6 text-white" />
@@ -916,10 +1169,16 @@ export function Integrations() {
                   <p className="text-sm text-gray-500">SMS and communication API</p>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
-                <Settings className="w-4 h-4 text-gray-400" />
-                <Badge className={twilioEnabled ? "bg-green-100 text-green-700 border-green-200" : "bg-gray-100 text-gray-700 border-gray-200"}>
-                  {twilioEnabled ? (
+              <div className="flex items-center gap-3">
+                <Badge
+                  variant={integrations.twilio?.enabled ? "default" : "secondary"}
+                  className={
+                    integrations.twilio?.enabled
+                      ? "bg-[#DCFCE7] text-[#15803D] border-[#BBF7D0]"
+                      : "bg-gray-100 text-gray-700 border-gray-200"
+                  }
+                >
+                  {integrations.twilio?.enabled ? (
                     <>
                       <Wifi className="w-3 h-3 mr-1" />
                       Active
@@ -931,19 +1190,23 @@ export function Integrations() {
                     </>
                   )}
                 </Badge>
+                <Switch
+                  checked={integrations.twilio?.enabled}
+                  onCheckedChange={() => handleToggle("twilio", integrations.twilio?.enabled)}
+                />
               </div>
             </div>
             <div className="flex gap-2 mt-4">
               <Button
                 variant="outline"
-                onClick={() => handleTestIntegration("Twilio")}
+                onClick={() => handleTestIntegration("twilio")}
                 className="flex-1"
               >
                 <ExternalLink className="w-4 h-4 mr-2" />
                 Test Integration
               </Button>
               <Button
-                onClick={() => handleUpdateCredentials("Twilio")}
+                onClick={() => handleUpdateCredentials("twilio")}
                 className="flex-1 bg-[#00BF63] hover:bg-[#00A055]"
               >
                 <RefreshCw className="w-4 h-4 mr-2" />
@@ -965,7 +1228,7 @@ export function Integrations() {
         <CardContent>
           {/* SendGrid */}
           <div className="p-4 border rounded-lg">
-            <div className="flex items-start justify-between">
+            <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-12 h-12 rounded-lg bg-blue-500 flex items-center justify-center">
                   <Bell className="w-6 h-6 text-white" />
@@ -975,10 +1238,16 @@ export function Integrations() {
                   <p className="text-sm text-gray-500">Email delivery service</p>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
-                <Settings className="w-4 h-4 text-gray-400" />
-                <Badge className={sendgridEnabled ? "bg-green-100 text-green-700 border-green-200" : "bg-gray-100 text-gray-700 border-gray-200"}>
-                  {sendgridEnabled ? (
+              <div className="flex items-center gap-3">
+                <Badge
+                  variant={integrations.sendgrid?.enabled ? "default" : "secondary"}
+                  className={
+                    integrations.sendgrid?.enabled
+                      ? "bg-[#DCFCE7] text-[#15803D] border-[#BBF7D0]"
+                      : "bg-gray-100 text-gray-700 border-gray-200"
+                  }
+                >
+                  {integrations.sendgrid?.enabled ? (
                     <>
                       <Wifi className="w-3 h-3 mr-1" />
                       Active
@@ -990,19 +1259,23 @@ export function Integrations() {
                     </>
                   )}
                 </Badge>
+                <Switch
+                  checked={integrations.sendgrid?.enabled}
+                  onCheckedChange={() => handleToggle("sendgrid", integrations.sendgrid?.enabled)}
+                />
               </div>
             </div>
             <div className="flex gap-2 mt-4">
               <Button
                 variant="outline"
-                onClick={() => handleTestIntegration("SendGrid")}
+                onClick={() => handleTestIntegration("sendgrid")}
                 className="flex-1"
               >
                 <ExternalLink className="w-4 h-4 mr-2" />
                 Test Integration
               </Button>
               <Button
-                onClick={() => handleUpdateCredentials("SendGrid")}
+                onClick={() => handleUpdateCredentials("sendgrid")}
                 className="flex-1 bg-[#00BF63] hover:bg-[#00A055]"
               >
                 <RefreshCw className="w-4 h-4 mr-2" />
@@ -1024,7 +1297,7 @@ export function Integrations() {
         <CardContent>
           {/* Google Maps */}
           <div className="p-4 border rounded-lg">
-            <div className="flex items-start justify-between mb-4">
+            <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-3">
                 <div className="w-12 h-12 rounded-lg bg-green-500 flex items-center justify-center">
                   <MapPin className="w-6 h-6 text-white" />
@@ -1034,10 +1307,16 @@ export function Integrations() {
                   <p className="text-sm text-gray-500">Location and mapping services</p>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
-                <Settings className="w-4 h-4 text-gray-400" />
-                <Badge className={googleMapsEnabled ? "bg-green-100 text-green-700 border-green-200" : "bg-gray-100 text-gray-700 border-gray-200"}>
-                  {googleMapsEnabled ? (
+              <div className="flex items-center gap-3">
+                <Badge
+                  variant={integrations.googleMaps?.enabled ? "default" : "secondary"}
+                  className={
+                    integrations.googleMaps?.enabled
+                      ? "bg-[#DCFCE7] text-[#15803D] border-[#BBF7D0]"
+                      : "bg-gray-100 text-gray-700 border-gray-200"
+                  }
+                >
+                  {integrations.googleMaps?.enabled ? (
                     <>
                       <Wifi className="w-3 h-3 mr-1" />
                       Active
@@ -1049,6 +1328,10 @@ export function Integrations() {
                     </>
                   )}
                 </Badge>
+                <Switch
+                  checked={integrations.googleMaps?.enabled}
+                  onCheckedChange={() => handleToggle("googleMaps", integrations.googleMaps?.enabled)}
+                />
               </div>
             </div>
             <div className="space-y-4">
@@ -1066,14 +1349,14 @@ export function Integrations() {
               <div className="flex gap-2">
                 <Button
                   variant="outline"
-                  onClick={() => handleTestIntegration("Google Maps")}
+                  onClick={() => handleTestIntegration("googleMaps")}
                   className="flex-1"
                 >
                   <ExternalLink className="w-4 h-4 mr-2" />
                   Test Integration
                 </Button>
                 <Button
-                  onClick={() => handleUpdateCredentials("Google Maps")}
+                  onClick={() => handleUpdateCredentials("googleMaps")}
                   className="flex-1 bg-[#00BF63] hover:bg-[#00A055]"
                 >
                   <RefreshCw className="w-4 h-4 mr-2" />
@@ -1096,7 +1379,7 @@ export function Integrations() {
         <CardContent className="space-y-4">
           {/* Mixpanel */}
           <div className="p-4 border rounded-lg">
-            <div className="flex items-start justify-between">
+            <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-12 h-12 rounded-lg bg-purple-500 flex items-center justify-center">
                   <BarChart3 className="w-6 h-6 text-white" />
@@ -1106,10 +1389,16 @@ export function Integrations() {
                   <p className="text-sm text-gray-500">Product analytics platform</p>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
-                <Settings className="w-4 h-4 text-gray-400" />
-                <Badge className={mixpanelEnabled ? "bg-green-100 text-green-700 border-green-200" : "bg-gray-100 text-gray-700 border-gray-200"}>
-                  {mixpanelEnabled ? (
+              <div className="flex items-center gap-3">
+                <Badge
+                  variant={integrations.mixpanel?.enabled ? "default" : "secondary"}
+                  className={
+                    integrations.mixpanel?.enabled
+                      ? "bg-[#DCFCE7] text-[#15803D] border-[#BBF7D0]"
+                      : "bg-gray-100 text-gray-700 border-gray-200"
+                  }
+                >
+                  {integrations.mixpanel?.enabled ? (
                     <>
                       <Wifi className="w-3 h-3 mr-1" />
                       Active
@@ -1121,19 +1410,23 @@ export function Integrations() {
                     </>
                   )}
                 </Badge>
+                <Switch
+                  checked={integrations.mixpanel?.enabled}
+                  onCheckedChange={() => handleToggle("mixpanel", integrations.mixpanel?.enabled)}
+                />
               </div>
             </div>
             <div className="flex gap-2 mt-4">
               <Button
                 variant="outline"
-                onClick={() => handleTestIntegration("Mixpanel")}
+                onClick={() => handleTestIntegration("mixpanel")}
                 className="flex-1"
               >
                 <ExternalLink className="w-4 h-4 mr-2" />
                 Test Integration
               </Button>
               <Button
-                onClick={() => handleUpdateCredentials("Mixpanel")}
+                onClick={() => handleUpdateCredentials("mixpanel")}
                 className="flex-1 bg-[#00BF63] hover:bg-[#00A055]"
               >
                 <RefreshCw className="w-4 h-4 mr-2" />
@@ -1144,7 +1437,7 @@ export function Integrations() {
 
           {/* Firebase */}
           <div className="p-4 border rounded-lg">
-            <div className="flex items-start justify-between">
+            <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-12 h-12 rounded-lg bg-orange-500 flex items-center justify-center">
                   <BarChart3 className="w-6 h-6 text-white" />
@@ -1154,10 +1447,16 @@ export function Integrations() {
                   <p className="text-sm text-gray-500">Analytics and app performance</p>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
-                <Settings className="w-4 h-4 text-gray-400" />
-                <Badge className={firebaseEnabled ? "bg-green-100 text-green-700 border-green-200" : "bg-gray-100 text-gray-700 border-gray-200"}>
-                  {firebaseEnabled ? (
+              <div className="flex items-center gap-3">
+                <Badge
+                  variant={integrations.firebase?.enabled ? "default" : "secondary"}
+                  className={
+                    integrations.firebase?.enabled
+                      ? "bg-[#DCFCE7] text-[#15803D] border-[#BBF7D0]"
+                      : "bg-gray-100 text-gray-700 border-gray-200"
+                  }
+                >
+                  {integrations.firebase?.enabled ? (
                     <>
                       <Wifi className="w-3 h-3 mr-1" />
                       Active
@@ -1169,19 +1468,23 @@ export function Integrations() {
                     </>
                   )}
                 </Badge>
+                <Switch
+                  checked={integrations.firebase?.enabled}
+                  onCheckedChange={() => handleToggle("firebase", integrations.firebase?.enabled)}
+                />
               </div>
             </div>
             <div className="flex gap-2 mt-4">
               <Button
                 variant="outline"
-                onClick={() => handleTestIntegration("Firebase")}
+                onClick={() => handleTestIntegration("firebase")}
                 className="flex-1"
               >
                 <ExternalLink className="w-4 h-4 mr-2" />
                 Test Integration
               </Button>
               <Button
-                onClick={() => handleUpdateCredentials("Firebase")}
+                onClick={() => handleUpdateCredentials("firebase")}
                 className="flex-1 bg-[#00BF63] hover:bg-[#00A055]"
               >
                 <RefreshCw className="w-4 h-4 mr-2" />

@@ -38,79 +38,17 @@ import {
   Clock,
   Mail,
   CheckCircle,
+  AlertCircle,
 } from "lucide-react";
 import { toast } from "sonner";
+import { Skeleton } from "../../components/ui/skeleton";
+import { useApi, apiCall } from "../../../hooks/useApi";
 
-// Mock data for recent reports
-const recentReports = [
-  {
-    id: 1,
-    name: "March Business Overview",
-    generatedDate: "2026-04-01T08:00:00",
-    format: "PDF",
-    size: "2.4 MB",
-  },
-  {
-    id: 2,
-    name: "Q1 2026 Business Summary",
-    generatedDate: "2026-03-31T18:30:00",
-    format: "Excel",
-    size: "1.8 MB",
-  },
-  {
-    id: 3,
-    name: "Weekly Business Report - Week 13",
-    generatedDate: "2026-03-30T09:00:00",
-    format: "PDF",
-    size: "1.2 MB",
-  },
-  {
-    id: 4,
-    name: "Service Provider Growth Analysis",
-    generatedDate: "2026-03-28T14:00:00",
-    format: "PDF",
-    size: "3.1 MB",
-  },
-  {
-    id: 5,
-    name: "February Business Overview",
-    generatedDate: "2026-03-01T08:00:00",
-    format: "Excel",
-    size: "2.6 MB",
-  },
-];
-
-// Mock data for scheduled reports
-const scheduledReportsData = [
-  {
-    id: 1,
-    name: "Daily Business Summary",
-    frequency: "Daily",
-    recipients: "admin@servease.ph, manager@servease.ph",
-    lastSent: "2026-04-01T08:00:00",
-    status: "Active",
-  },
-  {
-    id: 2,
-    name: "Weekly Business Overview",
-    frequency: "Weekly",
-    recipients: "admin@servease.ph",
-    lastSent: "2026-03-30T09:00:00",
-    status: "Active",
-  },
-  {
-    id: 3,
-    name: "Monthly Business Report",
-    frequency: "Monthly",
-    recipients: "admin@servease.ph, finance@servease.ph, ops@servease.ph",
-    lastSent: "2026-03-01T08:00:00",
-    status: "Active",
-  },
-];
-
-export function BusinessReports({ hideHeader = false }: { hideHeader?: boolean }) {
+export function BusinessReports({ hideHeader = false, apiPath = "business" }: { hideHeader?: boolean, apiPath?: string }) {
   const [isGenerateModalOpen, setIsGenerateModalOpen] = useState(false);
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
+  const [isEditScheduleOpen, setIsEditScheduleOpen] = useState(false);
+  const [selectedSchedule, setSelectedSchedule] = useState<any>(null);
 
   // Generate report form
   const [generateForm, setGenerateForm] = useState({
@@ -128,42 +66,64 @@ export function BusinessReports({ hideHeader = false }: { hideHeader?: boolean }
     format: "PDF",
   });
 
-  const handleGenerateReport = () => {
+  // Use the API hook for Business Reports
+  const { data, isLoading, error, refetch } = useApi<any>(
+    `/api/admin/v1/reports/${apiPath}`
+  );
+
+  const recentReports = data?.recentReports || [];
+  const scheduledReportsData = data?.scheduledReports || [];
+
+  const handleGenerateReport = async () => {
     if (!generateForm.template) {
       toast.error("Please select a report template");
       return;
     }
 
-    setIsGenerateModalOpen(false);
-    toast.success("Report generation started", {
-      description: "Your report will be ready in a few moments",
-    });
-
-    // Reset form
-    setGenerateForm({
-      template: "",
-      format: "PDF",
-      dateRange: "",
-    });
+    try {
+      await apiCall(`/api/admin/v1/reports/${apiPath}/generate`, {
+        method: "POST",
+        body: JSON.stringify(generateForm),
+      });
+      toast.success("Report generation started", {
+        description: "Your report will be ready in a few moments",
+      });
+      setIsGenerateModalOpen(false);
+      setGenerateForm({
+        template: "",
+        format: "PDF",
+        dateRange: "",
+      });
+      refetch();
+    } catch (err: any) {
+      toast.error("Failed to generate report", { description: err.message });
+    }
   };
 
-  const handleScheduleReport = () => {
+  const handleScheduleReport = async () => {
     if (!scheduleForm.name || !scheduleForm.template || !scheduleForm.frequency || !scheduleForm.recipients) {
       toast.error("Please fill in all required fields");
       return;
     }
 
-    setIsScheduleModalOpen(false);
-    toast.success("Report scheduled successfully");
-
-    // Reset form
-    setScheduleForm({
-      name: "",
-      template: "",
-      frequency: "",
-      recipients: "",
-      format: "PDF",
-    });
+    try {
+      await apiCall(`/api/admin/v1/reports/${apiPath}/schedule`, {
+        method: "POST",
+        body: JSON.stringify(scheduleForm),
+      });
+      toast.success("Report scheduled successfully");
+      setIsScheduleModalOpen(false);
+      setScheduleForm({
+        name: "",
+        template: "",
+        frequency: "",
+        recipients: "",
+        format: "PDF",
+      });
+      refetch();
+    } catch (err: any) {
+      toast.error("Failed to schedule report", { description: err.message });
+    }
   };
 
   const handleEditSchedule = (schedule: any) => {
@@ -171,14 +131,53 @@ export function BusinessReports({ hideHeader = false }: { hideHeader?: boolean }
     setIsEditScheduleOpen(true);
   };
 
-  const handleToggleSchedule = (scheduleId: number, currentStatus: string) => {
+  const handleToggleSchedule = async (scheduleId: number, currentStatus: string) => {
     const newStatus = currentStatus === "Active" ? "Disabled" : "Active";
-    toast.success(`Report ${newStatus === "Active" ? "enabled" : "disabled"} successfully`);
+    try {
+      await apiCall(`/api/admin/v1/reports/${apiPath}/schedule/${scheduleId}/toggle`, {
+        method: "PUT",
+        body: JSON.stringify({ status: newStatus }),
+      });
+      toast.success(`Report ${newStatus === "Active" ? "enabled" : "disabled"} successfully`);
+      refetch();
+    } catch (err: any) {
+      toast.error("Failed to update schedule status", { description: err.message });
+    }
   };
 
   const handleDownloadReport = (reportName: string) => {
     toast.success(`Downloading ${reportName}...`);
   };
+
+  if (error) {
+    return (
+      <Card className="border-red-200 bg-red-50">
+        <CardContent className="p-6 flex flex-col items-center justify-center text-center space-y-2">
+          <AlertCircle className="w-8 h-8 text-red-500" />
+          <p className="text-red-700 font-medium">Failed to load business reports data</p>
+          <p className="text-sm text-red-600">{error}</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        {!hideHeader && (
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <Skeleton className="h-8 w-48 mb-2" />
+              <Skeleton className="h-4 w-64" />
+            </div>
+          </div>
+        )}
+        <Skeleton className="h-[200px] w-full" />
+        <Skeleton className="h-[400px] w-full" />
+        <Skeleton className="h-[400px] w-full" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -285,84 +284,90 @@ export function BusinessReports({ hideHeader = false }: { hideHeader?: boolean }
           <CardTitle>Scheduled Reports</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Report Name</TableHead>
-                  <TableHead>Frequency</TableHead>
-                  <TableHead>Recipients</TableHead>
-                  <TableHead>Last Sent</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {scheduledReportsData.map((schedule) => (
-                  <TableRow key={schedule.id}>
-                    <TableCell className="font-medium text-gray-900">
-                      {schedule.name}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
-                        <Clock className="w-3 h-3 mr-1" />
-                        {schedule.frequency}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1 text-sm text-gray-600">
-                        <Mail className="w-3 h-3" />
-                        {schedule.recipients.split(",").length} recipient(s)
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-sm text-gray-600">
-                      {new Date(schedule.lastSent).toLocaleString("en-US", {
-                        month: "short",
-                        day: "numeric",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
-                    </TableCell>
-                    <TableCell>
-                      <Badge
-                        className={
-                          schedule.status === "Active"
-                            ? "bg-green-100 text-green-700 border-green-200"
-                            : "bg-gray-100 text-gray-700 border-gray-200"
-                        }
-                      >
-                        <CheckCircle className="w-3 h-3 mr-1" />
-                        {schedule.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleEditSchedule(schedule)}
-                        >
-                          <Edit2 className="w-3 h-3" />
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleToggleSchedule(schedule.id, schedule.status)}
+          {scheduledReportsData.length > 0 ? (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Report Name</TableHead>
+                    <TableHead>Frequency</TableHead>
+                    <TableHead>Recipients</TableHead>
+                    <TableHead>Last Sent</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {scheduledReportsData.map((schedule: any) => (
+                    <TableRow key={schedule.id}>
+                      <TableCell className="font-medium text-gray-900">
+                        {schedule.name}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                          <Clock className="w-3 h-3 mr-1" />
+                          {schedule.frequency}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-1 text-sm text-gray-600">
+                          <Mail className="w-3 h-3" />
+                          {schedule.recipients.split(",").length} recipient(s)
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-sm text-gray-600">
+                        {new Date(schedule.lastSent).toLocaleString("en-US", {
+                          month: "short",
+                          day: "numeric",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </TableCell>
+                      <TableCell>
+                        <Badge
                           className={
                             schedule.status === "Active"
-                              ? "text-red-600 hover:text-red-700"
-                              : "text-green-600 hover:text-green-700"
+                              ? "bg-green-100 text-green-700 border-green-200"
+                              : "bg-gray-100 text-gray-700 border-gray-200"
                           }
                         >
-                          <Power className="w-3 h-3" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+                          <CheckCircle className="w-3 h-3 mr-1" />
+                          {schedule.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleEditSchedule(schedule)}
+                          >
+                            <Edit2 className="w-3 h-3" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleToggleSchedule(schedule.id, schedule.status)}
+                            className={
+                              schedule.status === "Active"
+                                ? "text-red-600 hover:text-red-700"
+                                : "text-green-600 hover:text-green-700"
+                            }
+                          >
+                            <Power className="w-3 h-3" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          ) : (
+            <div className="text-center py-8 text-gray-500">
+              No scheduled reports found.
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -372,58 +377,64 @@ export function BusinessReports({ hideHeader = false }: { hideHeader?: boolean }
           <CardTitle>Recent Reports</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Report Name</TableHead>
-                  <TableHead>Generated Date</TableHead>
-                  <TableHead>Format</TableHead>
-                  <TableHead>Size</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {recentReports.map((report) => (
-                  <TableRow key={report.id}>
-                    <TableCell className="font-medium text-gray-900">
-                      <div className="flex items-center gap-2">
-                        <FileText className="w-4 h-4 text-gray-400" />
-                        {report.name}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-sm text-gray-600">
-                      {new Date(report.generatedDate).toLocaleString("en-US", {
-                        month: "short",
-                        day: "numeric",
-                        year: "numeric",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className="bg-gray-50">
-                        {report.format}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-sm text-gray-600">
-                      {report.size}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button
-                        size="sm"
-                        onClick={() => handleDownloadReport(report.name)}
-                        className="bg-[#00BF63] hover:bg-[#00A055]"
-                      >
-                        <Download className="w-3 h-3 mr-2" />
-                        Download
-                      </Button>
-                    </TableCell>
+          {recentReports.length > 0 ? (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Report Name</TableHead>
+                    <TableHead>Generated Date</TableHead>
+                    <TableHead>Format</TableHead>
+                    <TableHead>Size</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+                </TableHeader>
+                <TableBody>
+                  {recentReports.map((report: any) => (
+                    <TableRow key={report.id}>
+                      <TableCell className="font-medium text-gray-900">
+                        <div className="flex items-center gap-2">
+                          <FileText className="w-4 h-4 text-gray-400" />
+                          {report.name}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-sm text-gray-600">
+                        {new Date(report.generatedDate).toLocaleString("en-US", {
+                          month: "short",
+                          day: "numeric",
+                          year: "numeric",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="bg-gray-50">
+                          {report.format}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-sm text-gray-600">
+                        {report.size}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          size="sm"
+                          onClick={() => handleDownloadReport(report.name)}
+                          className="bg-[#00BF63] hover:bg-[#00A055]"
+                        >
+                          <Download className="w-3 h-3 mr-2" />
+                          Download
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          ) : (
+            <div className="text-center py-8 text-gray-500">
+              No recent reports found.
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -632,4 +643,4 @@ export function BusinessReports({ hideHeader = false }: { hideHeader?: boolean }
       </Dialog>
     </div>
   );
-}
+}

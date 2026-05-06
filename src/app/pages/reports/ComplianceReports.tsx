@@ -13,7 +13,7 @@ export function ComplianceReports() {
           </p>
         </div>
       </div>
-      <BusinessReports hideHeader={true} />
+      <BusinessReports hideHeader={true} apiPath="compliance" />
     </div>
   );
 }

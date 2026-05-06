@@ -58,7 +58,9 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router";
-
+import { toast } from "sonner";
+import { useApi, apiCall } from "../../hooks/useApi";
+import { Skeleton } from "./ui/skeleton";
 // Role permissions mapping
 const rolePermissions = {
   "Super Admin": [
@@ -111,37 +113,12 @@ type AdminType = {
 export function AdminRolesComponent() {
   const navigate = useNavigate();
   
-  // Admin data state (would normally come from API)
-  const [admins, setAdmins] = useState<AdminType[]>([
-    {
-      id: "ADM-001",
-      name: "Juan Dela Cruz",
-      email: "juan@servease.ph",
-      role: "Super Admin",
-      permissions: "Full Access",
-      lastLogin: "2026-03-04T14:30:00",
-      status: "Active",
-    },
-    {
-      id: "ADM-002",
-      name: "Maria Santos",
-      email: "maria@servease.ph",
-      role: "Finance Admin",
-      permissions: "Finance Only",
-      lastLogin: "2026-03-04T10:15:00",
-      status: "Active",
-    },
-    {
-      id: "ADM-003",
-      name: "Roberto Garcia",
-      email: "roberto@servease.ph",
-      role: "Support Admin",
-      permissions: "Support Only",
-      lastLogin: "2026-03-03T16:45:00",
-      status: "Inactive",
-    },
-  ]);
-
+  // Admin data state
+  const { data, isLoading, error, refetch } = useApi<AdminType[]>(
+    "/api/admin/v1/settings/roles"
+  );
+  
+  const admins = data || [];
   // Add New Admin modal state
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [fullName, setFullName] = useState("");
@@ -218,24 +195,41 @@ export function AdminRolesComponent() {
     return !newErrors.fullName && !newErrors.email && !newErrors.role;
   };
 
-  const handleCreateAdmin = () => {
+  const handleCreateAdmin = async () => {
     if (!validateForm()) {
       return;
     }
 
-    setGeneratedAdmin({ email: email, password: tempPassword });
+    try {
+      await apiCall("/api/admin/v1/settings/roles", {
+        method: "POST",
+        body: JSON.stringify({
+          name: fullName,
+          email,
+          role,
+          tempPassword,
+          requirePasswordChange,
+          sendInviteEmail
+        }),
+      });
+      
+      setGeneratedAdmin({ email: email, password: tempPassword });
 
-    // Reset form
-    setFullName("");
-    setEmail("");
-    setRole("");
-    setTempPassword("ServEase@2026!");
-    setRequirePasswordChange(true);
-    setSendInviteEmail(true);
-    setErrors({ fullName: "", email: "", role: "" });
+      // Reset form
+      setFullName("");
+      setEmail("");
+      setRole("");
+      setTempPassword("ServEase@2026!");
+      setRequirePasswordChange(true);
+      setSendInviteEmail(true);
+      setErrors({ fullName: "", email: "", role: "" });
 
-    setIsAddModalOpen(false);
-    setIsSuccessDialogOpen(true);
+      setIsAddModalOpen(false);
+      setIsSuccessDialogOpen(true);
+      refetch();
+    } catch (err: any) {
+      toast.error("Failed to create admin", { description: err.message });
+    }
   };
 
   const handleOpenAddModal = () => {
@@ -261,14 +255,21 @@ export function AdminRolesComponent() {
     setIsEditRoleOpen(true);
   };
 
-  const handleSaveEditRole = () => {
+  const handleSaveEditRole = async () => {
     if (editingAdmin && editRole) {
-      setAdmins((prev) =>
-        prev.map((a) => (a.id === editingAdmin.id ? { ...a, role: editRole } : a))
-      );
-      setIsEditRoleOpen(false);
-      setEditingAdmin(null);
-      setEditRole("");
+      try {
+        await apiCall(`/api/admin/v1/settings/roles/${editingAdmin.id}/role`, {
+          method: "PUT",
+          body: JSON.stringify({ role: editRole }),
+        });
+        toast.success("Admin role updated successfully");
+        setIsEditRoleOpen(false);
+        setEditingAdmin(null);
+        setEditRole("");
+        refetch();
+      } catch (err: any) {
+        toast.error("Failed to update role", { description: err.message });
+      }
     }
   };
 
@@ -277,10 +278,19 @@ export function AdminRolesComponent() {
     setIsResetPasswordOpen(true);
   };
 
-  const handleSendResetLink = () => {
-    setIsResetPasswordOpen(false);
-    setShowResetSuccess(true);
-    setTimeout(() => setShowResetSuccess(false), 3000);
+  const handleSendResetLink = async () => {
+    if (resetPasswordAdmin) {
+      try {
+        await apiCall(`/api/admin/v1/settings/roles/${resetPasswordAdmin.id}/reset-password`, {
+          method: "POST",
+        });
+        setIsResetPasswordOpen(false);
+        setShowResetSuccess(true);
+        setTimeout(() => setShowResetSuccess(false), 3000);
+      } catch (err: any) {
+        toast.error("Failed to send reset link", { description: err.message });
+      }
+    }
   };
 
   const handleDeactivate = (admin: AdminType) => {
@@ -288,13 +298,20 @@ export function AdminRolesComponent() {
     setIsDeactivateOpen(true);
   };
 
-  const handleConfirmDeactivate = () => {
+  const handleConfirmDeactivate = async () => {
     if (actionAdmin) {
-      setAdmins((prev) =>
-        prev.map((a) => (a.id === actionAdmin.id ? { ...a, status: "Inactive" } : a))
-      );
-      setIsDeactivateOpen(false);
-      setActionAdmin(null);
+      try {
+        await apiCall(`/api/admin/v1/settings/roles/${actionAdmin.id}/status`, {
+          method: "PUT",
+          body: JSON.stringify({ status: "Inactive" }),
+        });
+        toast.success("Admin deactivated successfully");
+        setIsDeactivateOpen(false);
+        setActionAdmin(null);
+        refetch();
+      } catch (err: any) {
+        toast.error("Failed to deactivate admin", { description: err.message });
+      }
     }
   };
 
@@ -303,13 +320,20 @@ export function AdminRolesComponent() {
     setIsActivateOpen(true);
   };
 
-  const handleConfirmActivate = () => {
+  const handleConfirmActivate = async () => {
     if (actionAdmin) {
-      setAdmins((prev) =>
-        prev.map((a) => (a.id === actionAdmin.id ? { ...a, status: "Active" } : a))
-      );
-      setIsActivateOpen(false);
-      setActionAdmin(null);
+      try {
+        await apiCall(`/api/admin/v1/settings/roles/${actionAdmin.id}/status`, {
+          method: "PUT",
+          body: JSON.stringify({ status: "Active" }),
+        });
+        toast.success("Admin activated successfully");
+        setIsActivateOpen(false);
+        setActionAdmin(null);
+        refetch();
+      } catch (err: any) {
+        toast.error("Failed to activate admin", { description: err.message });
+      }
     }
   };
 
@@ -319,6 +343,31 @@ export function AdminRolesComponent() {
     }
     return true;
   };
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <Skeleton className="h-8 w-64 mb-2" />
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <Skeleton className="h-24" />
+          <Skeleton className="h-24" />
+          <Skeleton className="h-24" />
+        </div>
+        <Skeleton className="h-[400px] w-full" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <Card className="border-red-200 bg-red-50">
+        <CardContent className="p-6 flex flex-col items-center justify-center text-center space-y-2">
+          <p className="text-red-700 font-medium">Failed to load admin roles data</p>
+          <p className="text-sm text-red-600">{error}</p>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <div className="space-y-6">

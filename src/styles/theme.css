@@ -197,3 +197,10 @@
     animation: slide-up 0.3s ease-out;
   }
 }
+
+/* Remove native browser eye icon in password fields */
+input::-ms-reveal,
+input::-ms-clear {
+  display: none !important;
+}
+

@@ -31,6 +31,7 @@ import {
   ArrowDownRight,
   Search,
   Eye,
+  AlertCircle,
 } from "lucide-react";
 import {
   LineChart,
@@ -45,31 +46,8 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { Badge } from "../../components/ui/badge";
-
-const bookingsOverTimeData = [
-  { date: "Feb 1", bookings: 67 },
-  { date: "Feb 5", bookings: 72 },
-  { date: "Feb 10", bookings: 69 },
-  { date: "Feb 15", bookings: 78 },
-  { date: "Feb 20", bookings: 83 },
-  { date: "Feb 25", bookings: 87 },
-  { date: "Feb 28", bookings: 92 },
-];
-
-const bookingStatusData = [
-  { name: "Completed", value: 2205, color: "#00BF63" },
-  { name: "Pending", value: 86, color: "#F59E0B" },
-  { name: "In Progress", value: 35, color: "#3B82F6" },
-  { name: "Cancelled", value: 45, color: "#EF4444" },
-];
-
-const bookingsListData = [
-  { id: "BKG-2847", scheduledDate: "2026-03-05", scheduledTime: "10:00 AM", customer: "Maria Santos", provider: "HomeFixPro Manila", category: "Home Maintenance", service: "Plumbing Repair", status: "Confirmed", amount: 2850 },
-  { id: "BKG-2846", scheduledDate: "2026-03-05", scheduledTime: "2:00 PM", customer: "Juan dela Cruz", provider: "Sparkle Clean Services", category: "Cleaning", service: "House Cleaning", status: "Confirmed", amount: 1950 },
-  { id: "BKG-2845", scheduledDate: "2026-03-04", scheduledTime: "11:00 AM", customer: "Ana Reyes", provider: "Glow Beauty Spa", category: "Beauty & Wellness", service: "Massage Therapy", status: "Completed", amount: 3200 },
-  { id: "BKG-2844", scheduledDate: "2026-03-10", scheduledTime: "6:00 PM", customer: "Carlos Mendoza", provider: "Celebrate Events Co.", category: "Events", service: "Event Photography", status: "Pending", amount: 15800 },
-  { id: "BKG-2843", scheduledDate: "2026-03-03", scheduledTime: "9:00 AM", customer: "Rosa Garcia", provider: "Pawsome Pet Care", category: "Pet Services", service: "Dog Grooming", status: "Completed", amount: 1250 },
-];
+import { Skeleton } from "../../components/ui/skeleton";
+import { useApi } from "../../../hooks/useApi";
 
 function KPICard({ label, value, change, icon: Icon, changeType }: any) {
   return (
@@ -104,6 +82,11 @@ export function BookingAnalytics() {
   const [selectedItem, setSelectedItem] = useState<any>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
 
+  // Use the API hook for Booking Analytics
+  const { data, isLoading, error } = useApi<any>(
+    `/api/admin/v1/reports/booking-analytics?dateRange=${dateRange}&category=${categoryFilter}&area=${serviceAreaFilter}&status=${statusFilter}`
+  );
+
   const handleExportCSV = () => {
     alert("✅ Exporting Booking Analytics data to CSV...");
   };
@@ -116,6 +99,12 @@ export function BookingAnalytics() {
     setSelectedItem(item);
     setDrawerOpen(true);
   };
+
+  // Fallback to empty data structure if no data is provided by the backend
+  const stats = data?.stats || {};
+  const bookingsOverTimeData = data?.bookingsOverTime || [];
+  const bookingStatusData = data?.bookingStatusData || [];
+  const bookingsListData = data?.bookingsList || [];
 
   return (
     <div className="space-y-6">
@@ -211,162 +200,207 @@ export function BookingAnalytics() {
         </CardContent>
       </Card>
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
-        <KPICard label="Total Bookings" value="2,326" change="+14.2%" changeType="up" icon={Package} />
-        <KPICard label="Completed" value="2,205" change="+15.1%" changeType="up" icon={CheckCircle} />
-        <KPICard label="Cancelled" value="45" change="-12%" changeType="down" icon={Package} />
-        <KPICard label="Completion Rate" value="94.8%" change="+2.1%" changeType="up" icon={TrendingUp} />
-        <KPICard label="Avg Booking Value" value="₱1,037" change="+5.3%" changeType="up" icon={DollarSign} />
-        <KPICard label="Avg Lead Time" value="3.2 days" change="-0.4 days" changeType="down" icon={Clock} />
-      </div>
-
-      {/* Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-[16px] font-semibold">Bookings Over Time</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={bookingsOverTimeData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                <XAxis dataKey="date" stroke="#6b7280" style={{ fontSize: 12 }} />
-                <YAxis stroke="#6b7280" style={{ fontSize: 12 }} />
-                <Tooltip />
-                <Line type="monotone" dataKey="bookings" stroke="#00BF63" strokeWidth={2} />
-              </LineChart>
-            </ResponsiveContainer>
+      {error ? (
+        <Card className="border-red-200 bg-red-50">
+          <CardContent className="p-6 flex flex-col items-center justify-center text-center space-y-2">
+            <AlertCircle className="w-8 h-8 text-red-500" />
+            <p className="text-red-700 font-medium">Failed to load booking analytics data</p>
+            <p className="text-sm text-red-600">{error}</p>
           </CardContent>
         </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-[16px] font-semibold">Booking Status Breakdown</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <PieChart>
-                <Pie
-                  data={bookingStatusData}
-                  cx="50%"
-                  cy="50%"
-                  labelLine={false}
-                  label={({ name, value }) => `${name}: ${value}`}
-                  outerRadius={100}
-                  fill="#8884d8"
-                  dataKey="value"
-                >
-                  {bookingStatusData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip />
-              </PieChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Detail Table */}
-      <Card>
-        <CardHeader>
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <CardTitle className="text-[16px] font-semibold">Bookings List</CardTitle>
-            <div className="relative w-full sm:w-64">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-              <Input
-                placeholder="Search bookings..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-9 text-[14px]"
-              />
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {/* Desktop/Tablet Table */}
-          <div className="hidden sm:block border rounded-lg overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="text-[12px] font-semibold">Booking ID</TableHead>
-                  <TableHead className="text-[12px] font-semibold">Scheduled Date/Time</TableHead>
-                  <TableHead className="text-[12px] font-semibold">Customer</TableHead>
-                  <TableHead className="text-[12px] font-semibold">Provider</TableHead>
-                  <TableHead className="text-[12px] font-semibold">Category</TableHead>
-                  <TableHead className="text-[12px] font-semibold">Service</TableHead>
-                  <TableHead className="text-[12px] font-semibold">Status</TableHead>
-                  <TableHead className="text-[12px] font-semibold text-right">Total Amount</TableHead>
-                  <TableHead className="text-[12px] font-semibold text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {bookingsListData.map((booking) => (
-                  <TableRow key={booking.id} className="hover:bg-gray-50">
-                    <TableCell className="text-[14px] font-medium">{booking.id}</TableCell>
-                    <TableCell className="text-[14px]">
-                      <div>{booking.scheduledDate}</div>
-                      <div className="text-gray-500 text-[12px]">{booking.scheduledTime}</div>
-                    </TableCell>
-                    <TableCell className="text-[14px]">{booking.customer}</TableCell>
-                    <TableCell className="text-[14px]">{booking.provider}</TableCell>
-                    <TableCell className="text-[14px]">{booking.category}</TableCell>
-                    <TableCell className="text-[14px]">{booking.service}</TableCell>
-                    <TableCell>
-                      <Badge className={
-                        booking.status === "Completed" ? "bg-green-100 text-green-700" :
-                        booking.status === "Confirmed" ? "bg-blue-100 text-blue-700" :
-                        "bg-yellow-100 text-yellow-700"
-                      }>
-                        {booking.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-[14px] text-right font-semibold">₱{booking.amount.toLocaleString()}</TableCell>
-                    <TableCell className="text-right">
-                      <Button variant="ghost" size="sm" onClick={() => openDrawer(booking)}>
-                        <Eye className="w-4 h-4" />
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-
-          {/* Mobile Cards */}
-          <div className="sm:hidden space-y-3">
-            {bookingsListData.map((booking) => (
-              <Card key={booking.id} className="p-4">
-                <div className="space-y-2">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <p className="text-[14px] font-semibold">{booking.id}</p>
-                      <p className="text-[12px] text-gray-500">{booking.scheduledDate} at {booking.scheduledTime}</p>
-                    </div>
-                    <Badge className={
-                      booking.status === "Completed" ? "bg-green-100 text-green-700" :
-                      booking.status === "Confirmed" ? "bg-blue-100 text-blue-700" :
-                      "bg-yellow-100 text-yellow-700"
-                    }>
-                      {booking.status}
-                    </Badge>
-                  </div>
-                  <div className="space-y-1 text-[13px]">
-                    <div><span className="text-gray-500">Customer:</span> <span className="ml-1">{booking.customer}</span></div>
-                    <div><span className="text-gray-500">Provider:</span> <span className="ml-1">{booking.provider}</span></div>
-                    <div><span className="text-gray-500">Service:</span> <span className="ml-1">{booking.service}</span></div>
-                    <div><span className="text-gray-500">Amount:</span> <span className="ml-1 font-semibold">₱{booking.amount.toLocaleString()}</span></div>
-                  </div>
-                  <Button variant="outline" size="sm" className="w-full text-[14px] font-medium" onClick={() => openDrawer(booking)}>
-                    View Details
-                  </Button>
-                </div>
-              </Card>
+      ) : isLoading ? (
+        <>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+            {[...Array(6)].map((_, i) => (
+              <Skeleton key={i} className="h-[104px] w-full rounded-xl" />
             ))}
           </div>
-        </CardContent>
-      </Card>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Skeleton className="h-[360px] w-full rounded-xl" />
+            <Skeleton className="h-[360px] w-full rounded-xl" />
+          </div>
+          <Skeleton className="h-[400px] w-full rounded-xl" />
+        </>
+      ) : (
+        <>
+          {/* KPI Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+            <KPICard label="Total Bookings" value={stats.totalBookings || "0"} change={stats.totalBookingsChange} changeType="up" icon={Package} />
+            <KPICard label="Completed" value={stats.completed || "0"} change={stats.completedChange} changeType="up" icon={CheckCircle} />
+            <KPICard label="Cancelled" value={stats.cancelled || "0"} change={stats.cancelledChange} changeType="down" icon={Package} />
+            <KPICard label="Completion Rate" value={stats.completionRate || "0%"} change={stats.completionRateChange} changeType="up" icon={TrendingUp} />
+            <KPICard label="Avg Booking Value" value={`₱${stats.avgBookingValue || "0"}`} change={stats.avgBookingValueChange} changeType="up" icon={DollarSign} />
+            <KPICard label="Avg Lead Time" value={stats.avgLeadTime || "0 days"} change={stats.avgLeadTimeChange} changeType="down" icon={Clock} />
+          </div>
+
+          {/* Charts */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-[16px] font-semibold">Bookings Over Time</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {bookingsOverTimeData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={300}>
+                    <LineChart data={bookingsOverTimeData}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                      <XAxis dataKey="date" stroke="#6b7280" style={{ fontSize: 12 }} />
+                      <YAxis stroke="#6b7280" style={{ fontSize: 12 }} />
+                      <Tooltip />
+                      <Line type="monotone" dataKey="bookings" stroke="#00BF63" strokeWidth={2} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="h-[300px] flex items-center justify-center text-gray-500">
+                    No data available for this period.
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-[16px] font-semibold">Booking Status Breakdown</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {bookingStatusData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={300}>
+                    <PieChart>
+                      <Pie
+                        data={bookingStatusData}
+                        cx="50%"
+                        cy="50%"
+                        labelLine={false}
+                        label={({ name, value }) => `${name}: ${value}`}
+                        outerRadius={100}
+                        fill="#8884d8"
+                        dataKey="value"
+                      >
+                        {bookingStatusData.map((entry: any, index: number) => (
+                          <Cell key={`cell-${index}`} fill={entry.color || "#ccc"} />
+                        ))}
+                      </Pie>
+                      <Tooltip />
+                    </PieChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="h-[300px] flex items-center justify-center text-gray-500">
+                    No data available for this period.
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Detail Table */}
+          <Card>
+            <CardHeader>
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <CardTitle className="text-[16px] font-semibold">Bookings List</CardTitle>
+                <div className="relative w-full sm:w-64">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                  <Input
+                    placeholder="Search bookings..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-9 text-[14px]"
+                  />
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {bookingsListData.length > 0 ? (
+                <>
+                  {/* Desktop/Tablet Table */}
+                  <div className="hidden sm:block border rounded-lg overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="text-[12px] font-semibold">Booking ID</TableHead>
+                          <TableHead className="text-[12px] font-semibold">Scheduled Date/Time</TableHead>
+                          <TableHead className="text-[12px] font-semibold">Customer</TableHead>
+                          <TableHead className="text-[12px] font-semibold">Provider</TableHead>
+                          <TableHead className="text-[12px] font-semibold">Category</TableHead>
+                          <TableHead className="text-[12px] font-semibold">Service</TableHead>
+                          <TableHead className="text-[12px] font-semibold">Status</TableHead>
+                          <TableHead className="text-[12px] font-semibold text-right">Total Amount</TableHead>
+                          <TableHead className="text-[12px] font-semibold text-right">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {bookingsListData.map((booking: any) => (
+                          <TableRow key={booking.id} className="hover:bg-gray-50">
+                            <TableCell className="text-[14px] font-medium">{booking.id}</TableCell>
+                            <TableCell className="text-[14px]">
+                              <div>{booking.scheduledDate}</div>
+                              <div className="text-gray-500 text-[12px]">{booking.scheduledTime}</div>
+                            </TableCell>
+                            <TableCell className="text-[14px]">{booking.customer}</TableCell>
+                            <TableCell className="text-[14px]">{booking.provider}</TableCell>
+                            <TableCell className="text-[14px]">{booking.category}</TableCell>
+                            <TableCell className="text-[14px]">{booking.service}</TableCell>
+                            <TableCell>
+                              <Badge className={
+                                booking.status === "Completed" ? "bg-green-100 text-green-700" :
+                                booking.status === "Confirmed" ? "bg-blue-100 text-blue-700" :
+                                "bg-yellow-100 text-yellow-700"
+                              }>
+                                {booking.status}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-[14px] text-right font-semibold">₱{Number(booking.amount).toLocaleString()}</TableCell>
+                            <TableCell className="text-right">
+                              <Button variant="ghost" size="sm" onClick={() => openDrawer(booking)}>
+                                <Eye className="w-4 h-4" />
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+
+                  {/* Mobile Cards */}
+                  <div className="sm:hidden space-y-3">
+                    {bookingsListData.map((booking: any) => (
+                      <Card key={booking.id} className="p-4">
+                        <div className="space-y-2">
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <p className="text-[14px] font-semibold">{booking.id}</p>
+                              <p className="text-[12px] text-gray-500">{booking.scheduledDate} at {booking.scheduledTime}</p>
+                            </div>
+                            <Badge className={
+                              booking.status === "Completed" ? "bg-green-100 text-green-700" :
+                              booking.status === "Confirmed" ? "bg-blue-100 text-blue-700" :
+                              "bg-yellow-100 text-yellow-700"
+                            }>
+                              {booking.status}
+                            </Badge>
+                          </div>
+                          <div className="space-y-1 text-[13px]">
+                            <div><span className="text-gray-500">Customer:</span> <span className="ml-1">{booking.customer}</span></div>
+                            <div><span className="text-gray-500">Provider:</span> <span className="ml-1">{booking.provider}</span></div>
+                            <div><span className="text-gray-500">Service:</span> <span className="ml-1">{booking.service}</span></div>
+                            <div><span className="text-gray-500">Amount:</span> <span className="ml-1 font-semibold">₱{Number(booking.amount).toLocaleString()}</span></div>
+                          </div>
+                          <Button variant="outline" size="sm" className="w-full text-[14px] font-medium" onClick={() => openDrawer(booking)}>
+                            View Details
+                          </Button>
+                        </div>
+                      </Card>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <div className="text-center py-8 text-gray-500">
+                  No bookings found for the selected filters.
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </>
+      )}
 
       {/* Detail Drawer */}
       <Sheet open={drawerOpen} onOpenChange={setDrawerOpen}>

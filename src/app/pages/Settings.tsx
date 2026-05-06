@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Label } from "../components/ui/label";
@@ -12,8 +12,13 @@ import {
 } from "../components/ui/select";
 import { Bell, Globe, Palette, Database, Save } from "lucide-react";
 import { toast } from "sonner";
+import { useApi, apiCall } from "../../hooks/useApi";
+import { Skeleton } from "../components/ui/skeleton";
+import { AlertCircle } from "lucide-react";
 
 export function Settings() {
+  const { data, isLoading, error } = useApi<any>("/api/admin/v1/settings");
+
   const [settings, setSettings] = useState({
     emailNotifications: true,
     pushNotifications: false,
@@ -26,9 +31,56 @@ export function Settings() {
     dataRetention: "90",
   });
 
-  const handleSave = () => {
-    toast.success("Settings saved successfully");
+  // Update local state when API data is available
+  useEffect(() => {
+    if (data) {
+      setSettings((prev) => ({ ...prev, ...data }));
+    }
+  }, [data]);
+
+  const handleSave = async () => {
+    try {
+      await apiCall("/api/admin/v1/settings", {
+        method: "PUT",
+        body: JSON.stringify(settings),
+      });
+      toast.success("Settings saved successfully");
+    } catch (err: any) {
+      toast.error("Failed to save settings", { description: err.message });
+    }
   };
+
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Account Settings</h1>
+          <p className="text-gray-500 mt-1">Manage your account preferences and notification settings</p>
+        </div>
+        <Card className="border-red-200 bg-red-50">
+          <CardContent className="p-6 flex flex-col items-center justify-center text-center space-y-2">
+            <AlertCircle className="w-8 h-8 text-red-500" />
+            <p className="text-red-700 font-medium">Failed to load settings API</p>
+            <p className="text-sm text-red-600">{error}</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <Skeleton className="h-8 w-64 mb-2" />
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <Skeleton className="h-[300px] w-full" />
+          <Skeleton className="h-[300px] w-full" />
+        </div>
+      </div>
+    );
+  }
+
+
 
   return (
     <div className="space-y-6">

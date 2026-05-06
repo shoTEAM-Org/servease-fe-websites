@@ -13,7 +13,7 @@ export function PerformanceReports() {
           </p>
         </div>
       </div>
-      <BusinessReports hideHeader={true} />
+      <BusinessReports hideHeader={true} apiPath="performance" />
     </div>
   );
 }

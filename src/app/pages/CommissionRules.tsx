@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
@@ -20,6 +20,9 @@ import {
   Percent,
   AlertCircle,
 } from "lucide-react";
+import { toast } from "sonner";
+import { useApi, apiCall } from "../../hooks/useApi";
+import { Skeleton } from "../components/ui/skeleton";
 
 interface CommissionRule {
   id: string;
@@ -32,155 +35,52 @@ interface CommissionRule {
   monthlyCommission: number;
 }
 
-const commissionRulesData: CommissionRule[] = [
-  {
-    id: "CR-001",
-    category: "Home Maintenance & Repair",
-    currentRate: 12,
-    previousRate: 10,
-    status: "active",
-    lastUpdated: "2026-02-15",
-    monthlyRevenue: 1250000,
-    monthlyCommission: 150000,
-  },
-  {
-    id: "CR-002",
-    category: "Beauty Wellness & Personal Care",
-    currentRate: 15,
-    previousRate: 15,
-    status: "active",
-    lastUpdated: "2026-01-20",
-    monthlyRevenue: 850000,
-    monthlyCommission: 127500,
-  },
-  {
-    id: "CR-003",
-    category: "Domestic & Cleaning Services",
-    currentRate: 10,
-    previousRate: 8,
-    status: "active",
-    lastUpdated: "2026-02-28",
-    monthlyRevenue: 980000,
-    monthlyCommission: 98000,
-  },
-  {
-    id: "CR-004",
-    category: "Pet Services",
-    currentRate: 18,
-    previousRate: 18,
-    status: "active",
-    lastUpdated: "2026-01-10",
-    monthlyRevenue: 450000,
-    monthlyCommission: 81000,
-  },
-  {
-    id: "CR-005",
-    category: "Events & Entertainment",
-    currentRate: 20,
-    previousRate: 18,
-    status: "active",
-    lastUpdated: "2026-03-01",
-    monthlyRevenue: 2100000,
-    monthlyCommission: 420000,
-  },
-  {
-    id: "CR-006",
-    category: "Automotive & Tech Support",
-    currentRate: 14,
-    previousRate: 14,
-    status: "active",
-    lastUpdated: "2025-12-15",
-    monthlyRevenue: 670000,
-    monthlyCommission: 93800,
-  },
-  {
-    id: "CR-007",
-    category: "Education & Professional Services",
-    currentRate: 16,
-    previousRate: 15,
-    status: "active",
-    lastUpdated: "2026-02-20",
-    monthlyRevenue: 540000,
-    monthlyCommission: 86400,
-  },
-  {
-    id: "CR-008",
-    category: "Health & Fitness",
-    currentRate: 13,
-    previousRate: 12,
-    status: "active",
-    lastUpdated: "2026-02-10",
-    monthlyRevenue: 720000,
-    monthlyCommission: 93600,
-  },
-];
-
-const stats = [
-  {
-    title: "Average Commission Rate",
-    value: "14.75%",
-    change: "+1.2% vs last month",
-    icon: Percent,
-    color: "text-blue-600",
-    bgColor: "bg-blue-50",
-  },
-  {
-    title: "Total Monthly Commission",
-    value: "₱1.15M",
-    change: "+18.5% vs last month",
-    icon: DollarSign,
-    color: "text-green-600",
-    bgColor: "bg-green-50",
-  },
-  {
-    title: "Active Categories",
-    value: "8",
-    change: "All categories operational",
-    icon: TrendingUp,
-    color: "text-purple-600",
-    bgColor: "bg-purple-50",
-  },
-  {
-    title: "Pending Changes",
-    value: "0",
-    change: "All rules updated",
-    icon: AlertCircle,
-    color: "text-orange-600",
-    bgColor: "bg-orange-50",
-  },
-];
-
 export function CommissionRules() {
-  const [rules, setRules] = useState<CommissionRule[]>(commissionRulesData);
+  const { data, isLoading, error } = useApi<any>("/api/admin/v1/commission-rules");
+  const [localRules, setLocalRules] = useState<CommissionRule[] | null>(null);
+  const apiStats = data?.stats || null;
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState<string>("");
+
+  useEffect(() => {
+    if (data?.rules) setLocalRules(data.rules);
+  }, [data]);
+
+  const rules: CommissionRule[] = localRules || data?.rules || [];
 
   const handleEdit = (rule: CommissionRule) => {
     setEditingId(rule.id);
     setEditValue(rule.currentRate.toString());
   };
 
-  const handleSave = (ruleId: string) => {
+  const handleSave = async (ruleId: string) => {
     const newRate = parseFloat(editValue);
     if (isNaN(newRate) || newRate < 0 || newRate > 100) {
-      alert("Please enter a valid percentage between 0 and 100");
+      toast.error("Please enter a valid percentage between 0 and 100");
       return;
     }
 
-    setRules(
-      rules.map((rule) =>
-        rule.id === ruleId
-          ? {
-              ...rule,
-              previousRate: rule.currentRate,
-              currentRate: newRate,
-              lastUpdated: new Date().toISOString().split("T")[0],
-            }
-          : rule
+    // Optimistic update — apply immediately, no reload, no toast
+    setLocalRules((prev) =>
+      (prev || []).map((r) =>
+        r.id === ruleId
+          ? { ...r, previousRate: r.currentRate, currentRate: newRate, lastUpdated: new Date().toISOString().split("T")[0] }
+          : r
       )
     );
     setEditingId(null);
     setEditValue("");
+
+    try {
+      await apiCall(`/api/admin/v1/commission-rules/${ruleId}`, {
+        method: "PUT",
+        body: JSON.stringify({ currentRate: newRate }),
+      });
+    } catch (err: any) {
+      // Revert on failure
+      if (data?.rules) setLocalRules(data.rules);
+      toast.error("Failed to update commission rule", { description: err.message });
+    }
   };
 
   const handleCancel = () => {
@@ -210,8 +110,78 @@ export function CommissionRules() {
     );
   };
 
-  const totalMonthlyRevenue = rules.reduce((sum, rule) => sum + rule.monthlyRevenue, 0);
-  const totalMonthlyCommission = rules.reduce((sum, rule) => sum + rule.monthlyCommission, 0);
+  const totalMonthlyRevenue = rules.reduce((sum: number, rule: CommissionRule) => sum + rule.monthlyRevenue, 0);
+  const totalMonthlyCommission = rules.reduce((sum: number, rule: CommissionRule) => sum + rule.monthlyCommission, 0);
+
+  // Stats array dynamically built from API data
+  const stats = [
+    {
+      title: "Average Commission Rate",
+      value: apiStats ? `${apiStats.averageRate}%` : "0%",
+      change: "vs last month",
+      icon: Percent,
+      color: "text-blue-600",
+      bgColor: "bg-blue-50",
+    },
+    {
+      title: "Total Monthly Commission",
+      value: apiStats ? `₱${(apiStats.totalCommission / 1000000).toFixed(2)}M` : "₱0",
+      change: "vs last month",
+      icon: DollarSign,
+      color: "text-green-600",
+      bgColor: "bg-green-50",
+    },
+    {
+      title: "Active Categories",
+      value: apiStats ? apiStats.activeCategories.toString() : "0",
+      change: "All categories operational",
+      icon: TrendingUp,
+      color: "text-purple-600",
+      bgColor: "bg-purple-50",
+    },
+    {
+      title: "Pending Changes",
+      value: apiStats ? apiStats.pendingChanges.toString() : "0",
+      change: "Rules waiting update",
+      icon: AlertCircle,
+      color: "text-orange-600",
+      bgColor: "bg-orange-50",
+    },
+  ];
+
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Commission Rules</h1>
+          <p className="text-gray-500 mt-1">Configure and manage commission rates for each service category</p>
+        </div>
+        <Card className="border-red-200 bg-red-50">
+          <CardContent className="p-6 flex flex-col items-center justify-center text-center space-y-2">
+            <AlertCircle className="w-8 h-8 text-red-500" />
+            <p className="text-red-700 font-medium">Failed to load commission rules API</p>
+            <p className="text-sm text-red-600">{error}</p>
+            <p className="text-xs text-red-500 mt-2">Actions are disabled until the API is available.</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <Skeleton className="h-8 w-64 mb-2" />
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+          <Skeleton className="h-24" />
+          <Skeleton className="h-24" />
+          <Skeleton className="h-24" />
+          <Skeleton className="h-24" />
+        </div>
+        <Skeleton className="h-[400px] w-full" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -289,7 +259,7 @@ export function CommissionRules() {
                         </div>
                       ) : (
                         <div className="flex items-center gap-2">
-                          <span className="font-semibold text-blue-600 text-lg">
+                          <span className="font-semibold text-blue-600 text-sm">
                             {rule.currentRate}%
                           </span>
                           {rule.currentRate !== rule.previousRate && (
