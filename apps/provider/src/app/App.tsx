@@ -1,9 +1,11 @@
 import { RouterProvider } from 'react-router';
 import { router } from './routes';
 import { ProviderDataProvider } from './context/ProviderDataContext';
+import { ProviderAuthProvider } from './context/ProviderAuthContext';
 
 function App() {
   return (
+    <ProviderAuthProvider>
     <ProviderDataProvider>
       <style>
         {`
@@ -82,6 +84,7 @@ function App() {
       </style>
       <RouterProvider router={router} />
     </ProviderDataProvider>
+    </ProviderAuthProvider>
   );
 }
 

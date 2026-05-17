@@ -2,9 +2,11 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router';
 import { Mail, Lock, Eye, EyeOff, ArrowRight, Calendar, DollarSign, Star } from 'lucide-react';
 import logo from "@/assets/d5c1631be6e8531539bd8040a765725f4a4ddc2c.png";
+import { useProviderAuth } from '../context/ProviderAuthContext';
 
 export function LoginPage() {
   const navigate = useNavigate();
+  const { login } = useProviderAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -15,18 +17,21 @@ export function LoginPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    if (!email || !password) {
+      setError('Please enter both email and password');
+      return;
+    }
     setIsLoading(true);
-
-    // Simulate API call
-    setTimeout(() => {
-      if (email && password) {
-        // Success - navigate to dashboard
-        navigate('/provider/dashboard');
-      } else {
-        setError('Please enter both email and password');
-        setIsLoading(false);
-      }
-    }, 1500);
+    try {
+      await login(email, password);
+      // login() stores session; read verificationStatus from it via context
+      // ProtectedRoute will redirect to verification-pending if not approved
+      navigate('/provider/dashboard');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Login failed. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   // Styles

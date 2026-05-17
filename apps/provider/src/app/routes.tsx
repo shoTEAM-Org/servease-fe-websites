@@ -1,6 +1,8 @@
 import { Navigate, createBrowserRouter } from "react-router";
 import { Layout } from "./components/Layout";
 import { LoginPage } from "./components/LoginPage";
+import { ProtectedRoute } from "./components/ProtectedRoute";
+import { VerificationPendingPage } from "./components/VerificationPendingPage";
 import { DashboardPage } from "./components/DashboardPage";
 import { CounterOfferPage } from "./components/CounterOfferPage";
 import { ProviderEarningsDashboard } from "./components/ProviderEarningsDashboard";
@@ -39,8 +41,15 @@ export const router = createBrowserRouter([
     Component: LoginPage,
   },
   {
+    path: "/provider/verification-pending",
+    Component: VerificationPendingPage,
+  },
+  {
     path: "/provider",
-    Component: Layout,
+    element: <ProtectedRoute />,
+    children: [{
+      path: "",
+      Component: Layout,
     children: [
       {
         path: "dashboard",
@@ -155,5 +164,5 @@ export const router = createBrowserRouter([
         element: <Navigate to="/provider/dashboard" replace />,
       },
     ],
-  },
+  }]},
 ]);
