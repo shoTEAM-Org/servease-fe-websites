@@ -37,6 +37,15 @@ type Admin = {
   status: "Active" | "Inactive";
 };
 
+type NotificationSettingsPayload = {
+  emailNotifications: boolean;
+  smsNotifications: boolean;
+  pushNotifications: boolean;
+  bookingAlerts: boolean;
+  paymentAlerts: boolean;
+  disputeAlerts: boolean;
+};
+
 // Role permissions mapping
 const rolePermissions = {
   "Admin": ["Manage Users", "Manage Roles", "Manage Permissions"],
@@ -51,7 +60,7 @@ export function AdminRoles() {
 
 // Notification Settings
 export function NotificationSettings() {
-  const { data, isLoading, error } = useApi<any>("/api/admin/v1/settings/notifications");
+  const { data, isLoading, error, refetch } = useApi<any>("/api/admin/v1/settings/notifications");
 
   const [emailNotifications, setEmailNotifications] = useState(true);
   const [smsNotifications, setSmsNotifications] = useState(false);
@@ -59,19 +68,58 @@ export function NotificationSettings() {
   const [bookingAlerts, setBookingAlerts] = useState(true);
   const [paymentAlerts, setPaymentAlerts] = useState(true);
   const [disputeAlerts, setDisputeAlerts] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+
+  const normalizeBoolean = (value: unknown, fallback: boolean) => {
+    if (typeof value === "boolean") {
+      return value;
+    }
+    if (typeof value === "number") {
+      return value !== 0;
+    }
+    if (typeof value === "string") {
+      const normalized = value.trim().toLowerCase();
+      if (["true", "1", "yes", "on", "enabled"].includes(normalized)) {
+        return true;
+      }
+      if (["false", "0", "no", "off", "disabled"].includes(normalized)) {
+        return false;
+      }
+    }
+    return fallback;
+  };
+
+  const getNotificationSettings = (payload: any) => {
+    return payload?.settings ?? payload?.notificationSettings ?? payload?.notification_settings ?? payload;
+  };
+
+  const normalizeNotificationSettings = (payload: any): NotificationSettingsPayload => {
+    const settings = getNotificationSettings(payload) ?? {};
+
+    return {
+      emailNotifications: normalizeBoolean(settings.emailNotifications ?? settings.email_notifications, true),
+      smsNotifications: normalizeBoolean(settings.smsNotifications ?? settings.sms_notifications, false),
+      pushNotifications: normalizeBoolean(settings.pushNotifications ?? settings.push_notifications, true),
+      bookingAlerts: normalizeBoolean(settings.bookingAlerts ?? settings.booking_alerts, true),
+      paymentAlerts: normalizeBoolean(settings.paymentAlerts ?? settings.payment_alerts, true),
+      disputeAlerts: normalizeBoolean(settings.disputeAlerts ?? settings.dispute_alerts, true),
+    };
+  };
 
   useEffect(() => {
     if (data) {
-      setEmailNotifications(data.emailNotifications ?? true);
-      setSmsNotifications(data.smsNotifications ?? false);
-      setPushNotifications(data.pushNotifications ?? true);
-      setBookingAlerts(data.bookingAlerts ?? true);
-      setPaymentAlerts(data.paymentAlerts ?? true);
-      setDisputeAlerts(data.disputeAlerts ?? true);
+      const settings = normalizeNotificationSettings(data);
+      setEmailNotifications(settings.emailNotifications);
+      setSmsNotifications(settings.smsNotifications);
+      setPushNotifications(settings.pushNotifications);
+      setBookingAlerts(settings.bookingAlerts);
+      setPaymentAlerts(settings.paymentAlerts);
+      setDisputeAlerts(settings.disputeAlerts);
     }
   }, [data]);
 
   const handleSave = async () => {
+    setIsSaving(true);
     try {
       await apiCall("/api/admin/v1/settings/notifications", {
         method: "PUT",
@@ -84,11 +132,14 @@ export function NotificationSettings() {
           disputeAlerts,
         }),
       });
+      await refetch();
       toast.success("Notification settings saved successfully", {
         className: "bg-[#00BF63] text-white border-none"
       });
     } catch (err: any) {
       toast.error("Failed to save settings", { description: err.message });
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -99,6 +150,13 @@ export function NotificationSettings() {
           <AlertCircle className="w-8 h-8 text-red-500" />
           <p className="text-red-700 font-medium">Failed to load notification settings</p>
           <p className="text-sm text-red-600">{error}</p>
+          <Button
+            variant="outline"
+            onClick={refetch}
+            className="mt-2 border-red-200 text-red-700 hover:bg-red-100"
+          >
+            Try Again
+          </Button>
         </CardContent>
       </Card>
     );
@@ -223,8 +281,12 @@ export function NotificationSettings() {
 
       {/* Save Button */}
       <div className="flex justify-end">
-        <Button onClick={handleSave} className="bg-[#00BF63] hover:bg-[#00A055]">
-          Save Settings
+        <Button
+          onClick={handleSave}
+          disabled={isSaving}
+          className="bg-[#00BF63] hover:bg-[#00A055]"
+        >
+          {isSaving ? "Saving..." : "Save Settings"}
         </Button>
       </div>
     </div>

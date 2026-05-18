@@ -23,7 +23,16 @@ export async function apiCall<T = any>(endpoint: string, options: RequestInit = 
     throw new Error(`Failed to fetch: ${response.status} ${response.statusText}`);
   }
 
-  const result = await response.json();
+  if (response.status === 204) {
+    return undefined as T;
+  }
+
+  const text = await response.text();
+  if (!text) {
+    return undefined as T;
+  }
+
+  const result = JSON.parse(text);
   return result.data !== undefined ? result.data : result;
 }
 

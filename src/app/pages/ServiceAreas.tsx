@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
@@ -49,9 +49,20 @@ import {
   XCircle,
   Users,
 } from "lucide-react";
+import { getApiBaseUrl, getAuthHeaders } from "../../hooks/useApi";
+
+type ServiceArea = {
+  id: string;
+  name: string;
+  city: string;
+  region: string;
+  status: "Active" | "Inactive";
+  providersAvailable: number;
+  coverage: string;
+};
 
 // Mock Service Areas Data
-const serviceAreasData = [
+const serviceAreasData: ServiceArea[] = [
   { id: "AREA-001", name: "Manila - Ermita", city: "Manila", region: "NCR", status: "Active", providersAvailable: 145, coverage: "Full coverage" },
   { id: "AREA-002", name: "Manila - Malate", city: "Manila", region: "NCR", status: "Active", providersAvailable: 132, coverage: "Full coverage" },
   { id: "AREA-003", name: "Quezon City - Diliman", city: "Quezon City", region: "NCR", status: "Active", providersAvailable: 198, coverage: "Full coverage" },
@@ -63,7 +74,95 @@ const serviceAreasData = [
   { id: "AREA-009", name: "Pasay - Mall of Asia Area", city: "Pasay", region: "NCR", status: "Active", providersAvailable: 167, coverage: "Full coverage" },
 ];
 
+const getFirstString = (source: Record<string, any>, keys: string[], fallback = "") => {
+  for (const key of keys) {
+    const value = source[key];
+    if (typeof value === "string" && value.trim()) {
+      return value.trim();
+    }
+    if (typeof value === "number") {
+      return String(value);
+    }
+  }
+  return fallback;
+};
+
+const getFirstNumber = (source: Record<string, any>, keys: string[], fallback = 0) => {
+  for (const key of keys) {
+    const value = source[key];
+    if (typeof value === "number" && Number.isFinite(value)) {
+      return value;
+    }
+    if (typeof value === "string" && value.trim() && Number.isFinite(Number(value))) {
+      return Number(value);
+    }
+  }
+  return fallback;
+};
+
+const normalizeStatus = (value: unknown): ServiceArea["status"] => {
+  if (typeof value === "boolean") {
+    return value ? "Active" : "Inactive";
+  }
+
+  const normalized = String(value ?? "").trim().toLowerCase();
+  return ["inactive", "disabled", "off", "false", "0"].includes(normalized) ? "Inactive" : "Active";
+};
+
+const getServiceAreaItems = (payload: any): any[] => {
+  if (Array.isArray(payload)) {
+    return payload;
+  }
+
+  const candidates = [
+    payload?.data,
+    payload?.serviceAreas,
+    payload?.service_areas,
+    payload?.areas,
+    payload?.items,
+    payload?.results,
+    payload?.rows,
+    payload?.records,
+    payload?.data?.serviceAreas,
+    payload?.data?.service_areas,
+    payload?.data?.areas,
+    payload?.data?.items,
+    payload?.data?.results,
+    payload?.data?.rows,
+    payload?.data?.records,
+  ];
+
+  return candidates.find(Array.isArray) ?? [];
+};
+
+const normalizeServiceArea = (area: any, index: number): ServiceArea => {
+  const source = area && typeof area === "object" ? area : {};
+  const city = getFirstString(source, ["city", "municipality", "locality", "town"], "Unknown");
+  const region = getFirstString(source, ["region", "province", "state", "areaRegion"], "NCR");
+  const name =
+    getFirstString(source, ["name", "areaName", "area_name", "label", "displayName", "display_name"]) ||
+    [city, getFirstString(source, ["district", "barangay", "zone"])].filter(Boolean).join(" - ") ||
+    `Service Area ${index + 1}`;
+
+  return {
+    id: getFirstString(source, ["id", "areaId", "area_id", "serviceAreaId", "service_area_id", "code"], `AREA-${String(index + 1).padStart(3, "0")}`),
+    name,
+    city,
+    region,
+    status: normalizeStatus(source.status ?? source.isActive ?? source.is_active ?? source.enabled),
+    providersAvailable: getFirstNumber(source, ["providersAvailable", "providers_available", "providerCount", "provider_count", "providers", "availableProviders", "available_providers"]),
+    coverage: getFirstString(source, ["coverage", "coverageLabel", "coverage_label", "coverageStatus", "coverage_status"], "Full coverage"),
+  };
+};
+
+const normalizeServiceAreasResponse = (payload: any): ServiceArea[] => {
+  return getServiceAreaItems(payload).map(normalizeServiceArea);
+};
+
 export function ServiceAreas() {
+  const [serviceAreas, setServiceAreas] = useState<ServiceArea[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [cityFilter, setCityFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -78,11 +177,54 @@ export function ServiceAreas() {
     status: "Active",
   });
 
+  useEffect(() => {
+    let isMounted = true;
+
+    const fetchServiceAreas = async () => {
+      setIsLoading(true);
+      setLoadError(null);
+
+      try {
+        const apiBaseUrl = getApiBaseUrl();
+        const response = await fetch(`${apiBaseUrl}/api/admin/v1/marketplace/service-areas`, {
+          headers: getAuthHeaders(),
+        });
+
+        if (!response.ok) {
+          throw new Error(`Failed to fetch service areas: ${response.status} ${response.statusText}`);
+        }
+
+        const payload = await response.json();
+        const normalizedAreas = normalizeServiceAreasResponse(payload);
+
+        if (isMounted) {
+          setServiceAreas(normalizedAreas);
+        }
+      } catch (error: any) {
+        console.warn("Falling back to mock service areas after fetch failed:", error);
+        if (isMounted) {
+          setLoadError(error?.message || "Failed to fetch service areas");
+          setServiceAreas(serviceAreasData);
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    fetchServiceAreas();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   // Get unique cities
-  const cities = Array.from(new Set(serviceAreasData.map((area) => area.city)));
+  const cities = Array.from(new Set(serviceAreas.map((area) => area.city))).filter(Boolean);
 
   // Filter service areas
-  const filteredAreas = serviceAreasData.filter((area) => {
+  const filteredAreas = serviceAreas.filter((area) => {
     const matchesSearch = area.name.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCity = cityFilter === "all" || area.city === cityFilter;
     const matchesStatus = statusFilter === "all" || area.status.toLowerCase() === statusFilter;
@@ -91,10 +233,10 @@ export function ServiceAreas() {
 
   // Calculate stats
   const stats = {
-    total: serviceAreasData.length,
-    active: serviceAreasData.filter((a) => a.status === "Active").length,
-    inactive: serviceAreasData.filter((a) => a.status === "Inactive").length,
-    totalProviders: serviceAreasData.reduce((sum, a) => sum + a.providersAvailable, 0),
+    total: serviceAreas.length,
+    active: serviceAreas.filter((a) => a.status === "Active").length,
+    inactive: serviceAreas.filter((a) => a.status === "Inactive").length,
+    totalProviders: serviceAreas.reduce((sum, a) => sum + a.providersAvailable, 0),
   };
 
   const handleAdd = () => {
@@ -161,7 +303,7 @@ export function ServiceAreas() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-500">Total Service Areas</p>
-                <p className="text-2xl font-bold text-gray-900 mt-1">{stats.total}</p>
+                <p className="text-2xl font-bold text-gray-900 mt-1">{isLoading ? "..." : stats.total}</p>
               </div>
               <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
                 <MapPin className="w-6 h-6 text-blue-600" />
@@ -175,7 +317,7 @@ export function ServiceAreas() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-500">Active Areas</p>
-                <p className="text-2xl font-bold text-gray-900 mt-1">{stats.active}</p>
+                <p className="text-2xl font-bold text-gray-900 mt-1">{isLoading ? "..." : stats.active}</p>
               </div>
               <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
                 <CheckCircle className="w-6 h-6 text-[#00BF63]" />
@@ -189,7 +331,7 @@ export function ServiceAreas() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-500">Inactive Areas</p>
-                <p className="text-2xl font-bold text-gray-900 mt-1">{stats.inactive}</p>
+                <p className="text-2xl font-bold text-gray-900 mt-1">{isLoading ? "..." : stats.inactive}</p>
               </div>
               <div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center">
                 <XCircle className="w-6 h-6 text-red-600" />
@@ -203,7 +345,7 @@ export function ServiceAreas() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-500">Total Providers</p>
-                <p className="text-2xl font-bold text-gray-900 mt-1">{stats.totalProviders}</p>
+                <p className="text-2xl font-bold text-gray-900 mt-1">{isLoading ? "..." : stats.totalProviders}</p>
               </div>
               <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
                 <Users className="w-6 h-6 text-purple-600" />
@@ -295,7 +437,14 @@ export function ServiceAreas() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredAreas.map((area) => (
+                {isLoading ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="py-12 text-center text-gray-500">
+                      Loading service areas...
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredAreas.map((area) => (
                   <TableRow key={area.id}>
                     <TableCell>
                       <div className="flex items-center gap-3">
@@ -368,12 +517,19 @@ export function ServiceAreas() {
                       </div>
                     </TableCell>
                   </TableRow>
-                ))}
+                  ))
+                )}
               </TableBody>
             </Table>
           </div>
 
-          {filteredAreas.length === 0 && (
+          {loadError && (
+            <p className="text-sm text-amber-600 mt-3">
+              Showing mock service areas because the backend request failed.
+            </p>
+          )}
+
+          {!isLoading && filteredAreas.length === 0 && (
             <div className="text-center py-12">
               <MapPin className="w-12 h-12 text-gray-300 mx-auto mb-4" />
               <p className="text-gray-500">No service areas found</p>
