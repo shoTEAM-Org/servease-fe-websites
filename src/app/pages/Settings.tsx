@@ -15,38 +15,44 @@ import { toast } from "sonner";
 import { useApi, apiCall } from "../../hooks/useApi";
 import { Skeleton } from "../components/ui/skeleton";
 import { AlertCircle } from "lucide-react";
+import {
+  applyAdminPreferences,
+  defaultAdminPreferences,
+  normalizeAdminPreferences,
+  persistAdminPreferences,
+} from "../utils/preferences";
+import { useTranslation } from "../contexts/LanguageContext";
 
 export function Settings() {
+  const { t } = useTranslation();
   const { data, isLoading, error } = useApi<any>("/api/admin/v1/settings");
 
   const [settings, setSettings] = useState({
-    emailNotifications: true,
-    pushNotifications: false,
-    bookingAlerts: true,
-    paymentAlerts: true,
-    disputeAlerts: true,
-    language: "en",
-    timezone: "Asia/Manila",
-    theme: "light",
-    dataRetention: "90",
+    ...defaultAdminPreferences(),
   });
 
   // Update local state when API data is available
   useEffect(() => {
     if (data) {
-      setSettings((prev) => ({ ...prev, ...data }));
+      const generalSettings = normalizeAdminPreferences(data.general ?? data);
+      setSettings((prev) => ({ ...prev, ...generalSettings }));
+      applyAdminPreferences(generalSettings);
     }
   }, [data]);
 
   const handleSave = async () => {
     try {
-      await apiCall("/api/admin/v1/settings", {
+      const response = await apiCall<any>("/api/admin/v1/settings", {
         method: "PUT",
         body: JSON.stringify(settings),
       });
-      toast.success("Settings saved successfully");
+      const savedSettings = normalizeAdminPreferences(response?.settings ?? settings);
+      persistAdminPreferences(savedSettings);
+      applyAdminPreferences(savedSettings);
+      setSettings(savedSettings);
+      toast.success(t("settings.saveSuccess"));
     } catch (err: any) {
-      toast.error("Failed to save settings", { description: err.message });
+      toast.error(t("settings.saveFailed"), { description: err.message });
     }
   };
 
@@ -54,13 +60,13 @@ export function Settings() {
     return (
       <div className="space-y-6">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Account Settings</h1>
-          <p className="text-gray-500 mt-1">Manage your account preferences and notification settings</p>
+          <h1 className="text-3xl font-bold text-gray-900">{t("settings.pageTitle")}</h1>
+          <p className="text-gray-500 mt-1">{t("settings.pageSubtitle")}</p>
         </div>
         <Card className="border-red-200 bg-red-50">
           <CardContent className="p-6 flex flex-col items-center justify-center text-center space-y-2">
             <AlertCircle className="w-8 h-8 text-red-500" />
-            <p className="text-red-700 font-medium">Failed to load settings API</p>
+            <p className="text-red-700 font-medium">{t("settings.failedLoad")}</p>
             <p className="text-sm text-red-600">{error}</p>
           </CardContent>
         </Card>
@@ -86,9 +92,9 @@ export function Settings() {
     <div className="space-y-6">
       {/* Page Header */}
       <div>
-        <h1 className="text-3xl font-bold text-gray-900">Account Settings</h1>
+        <h1 className="text-3xl font-bold text-gray-900">{t("settings.pageTitle")}</h1>
         <p className="text-gray-500 mt-1">
-          Manage your account preferences and notification settings
+          {t("settings.pageSubtitle")}
         </p>
       </div>
 
@@ -99,16 +105,16 @@ export function Settings() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Bell className="w-5 h-5 text-[#00BF63]" />
-              Notifications
+              {t("settings.notifications")}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
             {/* Email Notifications */}
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">
-                <Label htmlFor="email-notif">Email Notifications</Label>
+                <Label htmlFor="email-notif">{t("settings.emailNotifications")}</Label>
                 <p className="text-sm text-gray-500">
-                  Receive email updates about platform activity
+                  {t("settings.emailNotificationsDesc")}
                 </p>
               </div>
               <Switch
@@ -123,9 +129,9 @@ export function Settings() {
             {/* Push Notifications */}
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">
-                <Label htmlFor="push-notif">Push Notifications</Label>
+                <Label htmlFor="push-notif">{t("settings.pushNotifications")}</Label>
                 <p className="text-sm text-gray-500">
-                  Get real-time browser notifications
+                  {t("settings.pushNotificationsDesc")}
                 </p>
               </div>
               <Switch
@@ -140,9 +146,9 @@ export function Settings() {
             {/* Booking Alerts */}
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">
-                <Label htmlFor="booking-alerts">Booking Alerts</Label>
+                <Label htmlFor="booking-alerts">{t("settings.bookingAlerts")}</Label>
                 <p className="text-sm text-gray-500">
-                  Notify about new bookings and updates
+                  {t("settings.bookingAlertsDesc")}
                 </p>
               </div>
               <Switch
@@ -157,9 +163,9 @@ export function Settings() {
             {/* Payment Alerts */}
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">
-                <Label htmlFor="payment-alerts">Payment Alerts</Label>
+                <Label htmlFor="payment-alerts">{t("settings.paymentAlerts")}</Label>
                 <p className="text-sm text-gray-500">
-                  Get notified about payments and payouts
+                  {t("settings.paymentAlertsDesc")}
                 </p>
               </div>
               <Switch
@@ -174,9 +180,9 @@ export function Settings() {
             {/* Dispute Alerts */}
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">
-                <Label htmlFor="dispute-alerts">Dispute Alerts</Label>
+                <Label htmlFor="dispute-alerts">{t("settings.disputeAlerts")}</Label>
                 <p className="text-sm text-gray-500">
-                  Alert when disputes are filed
+                  {t("settings.disputeAlertsDesc")}
                 </p>
               </div>
               <Switch
@@ -195,13 +201,13 @@ export function Settings() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Globe className="w-5 h-5 text-[#00BF63]" />
-              Regional & Preferences
+              {t("settings.regionalPreferences")}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
             {/* Language */}
             <div className="space-y-2">
-              <Label htmlFor="language">Language</Label>
+              <Label htmlFor="language">{t("settings.language")}</Label>
               <Select
                 value={settings.language}
                 onValueChange={(value) =>
@@ -209,18 +215,18 @@ export function Settings() {
                 }
               >
                 <SelectTrigger id="language">
-                  <SelectValue placeholder="Select language" />
+                  <SelectValue placeholder={t("settings.selectLanguage")} />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="en">English</SelectItem>
-                  <SelectItem value="fil">Filipino</SelectItem>
+                  <SelectItem value="fil">{t("settings.filipino")}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
             {/* Timezone */}
             <div className="space-y-2">
-              <Label htmlFor="timezone">Timezone</Label>
+              <Label htmlFor="timezone">{t("settings.timezone")}</Label>
               <Select
                 value={settings.timezone}
                 onValueChange={(value) =>
@@ -228,7 +234,7 @@ export function Settings() {
                 }
               >
                 <SelectTrigger id="timezone">
-                  <SelectValue placeholder="Select timezone" />
+                  <SelectValue placeholder={t("settings.selectTimezone")} />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="Asia/Manila">
@@ -251,13 +257,13 @@ export function Settings() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Palette className="w-5 h-5 text-[#00BF63]" />
-              Appearance
+              {t("settings.appearance")}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
             {/* Theme */}
             <div className="space-y-2">
-              <Label htmlFor="theme">Theme</Label>
+              <Label htmlFor="theme">{t("settings.theme")}</Label>
               <Select
                 value={settings.theme}
                 onValueChange={(value) =>
@@ -265,16 +271,16 @@ export function Settings() {
                 }
               >
                 <SelectTrigger id="theme">
-                  <SelectValue placeholder="Select theme" />
+                  <SelectValue placeholder={t("settings.selectTheme")} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="light">Light</SelectItem>
-                  <SelectItem value="dark">Dark</SelectItem>
-                  <SelectItem value="auto">Auto (System)</SelectItem>
+                  <SelectItem value="light">{t("settings.light")}</SelectItem>
+                  <SelectItem value="dark">{t("settings.dark")}</SelectItem>
+                  <SelectItem value="auto">{t("settings.autoSystem")}</SelectItem>
                 </SelectContent>
               </Select>
               <p className="text-xs text-gray-500">
-                Choose your preferred color theme
+                {t("settings.themeDesc")}
               </p>
             </div>
           </CardContent>
@@ -285,13 +291,13 @@ export function Settings() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Database className="w-5 h-5 text-[#00BF63]" />
-              Data & Privacy
+              {t("settings.dataPrivacy")}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
             {/* Data Retention */}
             <div className="space-y-2">
-              <Label htmlFor="retention">Data Retention Period</Label>
+              <Label htmlFor="retention">{t("settings.dataRetentionPeriod")}</Label>
               <Select
                 value={settings.dataRetention}
                 onValueChange={(value) =>
@@ -299,7 +305,7 @@ export function Settings() {
                 }
               >
                 <SelectTrigger id="retention">
-                  <SelectValue placeholder="Select period" />
+                  <SelectValue placeholder={t("settings.selectPeriod")} />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="30">30 days</SelectItem>
@@ -310,7 +316,7 @@ export function Settings() {
                 </SelectContent>
               </Select>
               <p className="text-xs text-gray-500">
-                How long to keep historical data
+                {t("settings.dataRetentionDesc")}
               </p>
             </div>
           </CardContent>
@@ -324,7 +330,7 @@ export function Settings() {
           className="bg-[#00BF63] hover:bg-[#00A055]"
         >
           <Save className="w-4 h-4 mr-2" />
-          Save Settings
+          {t("settings.saveSettings")}
         </Button>
       </div>
     </div>

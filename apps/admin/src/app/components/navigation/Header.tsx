@@ -13,17 +13,143 @@ import {
 } from "lucide-react";
 import { Badge } from "../ui/badge";
 import { Input } from "../ui/input";
+import { apiCall } from "../../../services/api";
+
+type AdminProfile = {
+  id?: string;
+  full_name?: string;
+  name?: string;
+  email?: string;
+  role?: string;
+  avatar_url?: string;
+};
+
+type NotificationItem = {
+  id: string;
+  title: string;
+  message: string;
+  createdAt?: string;
+  isRead: boolean;
+  type?: string;
+};
+
+function formatRole(role?: string) {
+  if (!role) return "Admin";
+  return role
+    .split(/[_\s]+/)
+    .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
+    .join(" ");
+}
+
+function getInitials(name: string) {
+  const trimmed = name.trim();
+  if (!trimmed) return "--";
+  const parts = trimmed.split(/\s+/).slice(0, 2);
+  return parts.map((part) => part.charAt(0).toUpperCase()).join("");
+}
+
+function formatRelativeTime(value?: string) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const diffMs = Date.now() - date.getTime();
+  const diffSeconds = Math.max(0, Math.floor(diffMs / 1000));
+  if (diffSeconds < 60) return "Just now";
+  const diffMinutes = Math.floor(diffSeconds / 60);
+  if (diffMinutes < 60) return `${diffMinutes} min ago`;
+  const diffHours = Math.floor(diffMinutes / 60);
+  if (diffHours < 24) return `${diffHours} hr ago`;
+  const diffDays = Math.floor(diffHours / 24);
+  return `${diffDays} day${diffDays === 1 ? "" : "s"} ago`;
+}
+
+function normalizeNotifications(payload: any): NotificationItem[] {
+  const raw = Array.isArray(payload)
+    ? payload
+    : Array.isArray(payload?.notifications)
+      ? payload.notifications
+      : [];
+
+  return raw
+    .map((item: any) => {
+      const id = String(item?.id ?? item?.notification_id ?? "");
+      if (!id) return null;
+      return {
+        id,
+        title: String(item?.title ?? "Notification"),
+        message: String(item?.message ?? item?.body ?? ""),
+        createdAt: item?.created_at ?? item?.createdAt,
+        isRead: Boolean(item?.is_read ?? item?.isRead ?? false),
+        type: item?.type ?? "system",
+      };
+    })
+    .filter((item: NotificationItem | null): item is NotificationItem => item !== null);
+}
 
 export function Header() {
   const navigate = useNavigate();
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [profile, setProfile] = useState<AdminProfile | null>(null);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const [isLoadingNotifications, setIsLoadingNotifications] = useState(false);
+  const [notificationsError, setNotificationsError] = useState<string | null>(null);
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
+
+  useEffect(() => {
+    const loadProfile = async () => {
+      try {
+        const response = await apiCall<any>("/api/admin/v1/account/profile");
+        const record = response?.profile ?? response;
+        setProfile(record ?? null);
+      } catch {
+        setProfile(null);
+      }
+    };
+
+    void loadProfile();
+  }, []);
+
+  useEffect(() => {
+    const loadNotifications = async () => {
+      setIsLoadingNotifications(true);
+      setNotificationsError(null);
+      try {
+        const response = await apiCall<any>("/api/notifications/v1");
+        setNotifications(normalizeNotifications(response));
+      } catch (err: any) {
+        setNotifications([]);
+        setNotificationsError(err?.message || "Failed to load notifications");
+      } finally {
+        setIsLoadingNotifications(false);
+      }
+    };
+
+    void loadNotifications();
+  }, []);
+
+  useEffect(() => {
+    if (!showNotifications) return;
+    const refreshNotifications = async () => {
+      setIsLoadingNotifications(true);
+      setNotificationsError(null);
+      try {
+        const response = await apiCall<any>("/api/notifications/v1");
+        setNotifications(normalizeNotifications(response));
+      } catch (err: any) {
+        setNotificationsError(err?.message || "Failed to load notifications");
+      } finally {
+        setIsLoadingNotifications(false);
+      }
+    };
+
+    void refreshNotifications();
+  }, [showNotifications]);
 
   const formattedTime = currentTime.toLocaleTimeString("en-US", {
     hour: "2-digit",
@@ -38,50 +164,33 @@ export function Header() {
     year: "numeric",
   });
 
-  const notifications = [
-    {
-      id: 1,
-      type: "booking",
-      title: "New Booking Request",
-      message: "Maria Santos requested a cleaning service in Makati",
-      time: "2 minutes ago",
-      unread: true,
-    },
-    {
-      id: 2,
-      type: "approval",
-      title: "Provider Pending Approval",
-      message: "New service provider awaiting KYC verification",
-      time: "15 minutes ago",
-      unread: true,
-    },
-    {
-      id: 3,
-      type: "payment",
-      title: "Payout Request",
-      message: "Provider #1234 requested ₱12,500.00 payout",
-      time: "1 hour ago",
-      unread: true,
-    },
-    {
-      id: 4,
-      type: "dispute",
-      title: "Dispute Raised",
-      message: "Customer filed a dispute for booking #BK-2024-001",
-      time: "3 hours ago",
-      unread: false,
-    },
-    {
-      id: 5,
-      type: "system",
-      title: "System Update",
-      message: "Platform maintenance scheduled for tonight at 2:00 AM",
-      time: "5 hours ago",
-      unread: false,
-    },
-  ];
+  const unreadCount = notifications.filter((n) => !n.isRead).length;
+  const displayName = profile?.full_name || profile?.name || "";
+  const displayRole = formatRole(profile?.role);
+  const displayEmail = profile?.email || "";
+  const displayInitials = getInitials(displayName || "Admin");
 
-  const unreadCount = notifications.filter((n) => n.unread).length;
+  const markAllRead = async () => {
+    try {
+      await apiCall("/api/notifications/v1/read-all", { method: "PATCH" });
+      setNotifications((prev) => prev.map((item) => ({ ...item, isRead: true })));
+    } catch (err: any) {
+      setNotificationsError(err?.message || "Failed to mark notifications as read");
+    }
+  };
+
+  const markRead = async (notificationId: string) => {
+    try {
+      await apiCall(`/api/notifications/v1/${notificationId}/read`, { method: "PATCH" });
+      setNotifications((prev) =>
+        prev.map((item) =>
+          item.id === notificationId ? { ...item, isRead: true } : item,
+        ),
+      );
+    } catch (err: any) {
+      setNotificationsError(err?.message || "Failed to update notification");
+    }
+  };
 
   return (
     <header className="h-16 bg-white border-b border-gray-200 px-6 flex items-center justify-between sticky top-0 z-20 shadow-sm">
@@ -135,29 +244,48 @@ export function Header() {
                     <h3 className="text-sm font-semibold text-gray-900">Notifications</h3>
                     <p className="text-xs text-gray-400">{unreadCount} unread</p>
                   </div>
-                  <button className="text-xs text-[#16A34A] hover:text-[#15803D] font-medium">
+                  <button
+                    className="text-xs text-[#16A34A] hover:text-[#15803D] font-medium"
+                    onClick={markAllRead}
+                  >
                     Mark all read
                   </button>
                 </div>
 
                 <div className="max-h-80 overflow-y-auto divide-y divide-gray-50">
-                  {notifications.map((notification) => (
+                  {isLoadingNotifications && (
+                    <div className="px-4 py-6 text-xs text-gray-400">Loading notifications...</div>
+                  )}
+                  {!isLoadingNotifications && notificationsError && (
+                    <div className="px-4 py-6 text-xs text-red-500">{notificationsError}</div>
+                  )}
+                  {!isLoadingNotifications && !notificationsError && notifications.length === 0 && (
+                    <div className="px-4 py-6 text-xs text-gray-400">No notifications yet.</div>
+                  )}
+                  {!isLoadingNotifications && !notificationsError && notifications.map((notification) => (
                     <button
                       key={notification.id}
+                      onClick={() => {
+                        if (!notification.isRead) {
+                          void markRead(notification.id);
+                        }
+                      }}
                       className={`w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors ${
-                        notification.unread ? "bg-green-50/50" : ""
+                        !notification.isRead ? "bg-green-50/50" : ""
                       }`}
                     >
                       <div className="flex items-start gap-3">
                         <div
                           className={`w-2 h-2 rounded-full mt-2 flex-shrink-0 ${
-                            notification.unread ? "bg-[#16A34A]" : "bg-gray-200"
+                            !notification.isRead ? "bg-[#16A34A]" : "bg-gray-200"
                           }`}
                         />
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium text-gray-900">{notification.title}</p>
                           <p className="text-xs text-gray-500 mt-0.5">{notification.message}</p>
-                          <p className="text-xs text-gray-400 mt-1">{notification.time}</p>
+                          <p className="text-xs text-gray-400 mt-1">
+                            {formatRelativeTime(notification.createdAt)}
+                          </p>
                         </div>
                       </div>
                     </button>
@@ -187,11 +315,13 @@ export function Header() {
             className="flex items-center gap-2.5 py-1.5 px-2 rounded-lg hover:bg-gray-100 transition-colors"
           >
             <div className="w-8 h-8 bg-gradient-to-br from-[#16A34A] to-[#059669] rounded-full flex items-center justify-center flex-shrink-0 shadow-sm">
-              <span className="text-xs font-bold text-white">AD</span>
+              <span className="text-xs font-bold text-white">{displayInitials}</span>
             </div>
             <div className="text-left hidden md:block">
-              <p className="text-sm font-semibold text-gray-900 leading-none">Admin User</p>
-              <p className="text-xs text-gray-400 mt-0.5">Super Admin</p>
+              <p className="text-sm font-semibold text-gray-900 leading-none">
+                {displayName || "Admin"}
+              </p>
+              <p className="text-xs text-gray-400 mt-0.5">{displayRole}</p>
             </div>
             <ChevronDown
               className={`w-4 h-4 text-gray-400 transition-transform duration-200 ${
@@ -208,11 +338,13 @@ export function Header() {
                 <div className="px-4 py-3 border-b border-gray-100">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 bg-gradient-to-br from-[#16A34A] to-[#059669] rounded-full flex items-center justify-center shadow-sm">
-                      <span className="text-sm font-bold text-white">AD</span>
+                      <span className="text-sm font-bold text-white">{displayInitials}</span>
                     </div>
                     <div>
-                      <p className="text-sm font-semibold text-gray-900">Juan Dela Cruz</p>
-                      <p className="text-xs text-gray-400">juan@servease.ph</p>
+                      <p className="text-sm font-semibold text-gray-900">
+                        {displayName || "Admin"}
+                      </p>
+                      <p className="text-xs text-gray-400">{displayEmail || ""}</p>
                     </div>
                   </div>
                 </div>

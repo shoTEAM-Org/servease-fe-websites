@@ -597,24 +597,31 @@ export function Revenue() {
 
       {/* Detail Drawer */}
       <Sheet open={drawerOpen} onOpenChange={setDrawerOpen}>
-        <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
+        <SheetContent className="w-full sm:max-w-lg overflow-y-auto px-6 py-6 sm:px-8">
           {selectedItem && (
             <>
               <SheetHeader>
                 <SheetTitle className="text-[18px] font-semibold">Details</SheetTitle>
               </SheetHeader>
-              <div className="mt-6 space-y-4">
-                <div className="p-4 bg-gray-50 rounded-lg">
+              <div className="mt-6 space-y-5">
+                <div className="rounded-lg bg-gray-50 p-4">
                   <p className="text-[13px] font-medium text-gray-500">Summary</p>
-                  <p className="text-[14px] text-gray-900 mt-1">
+                  <p className="mt-2 text-[14px] leading-6 text-gray-900">
                     {selectedItem.category || "Revenue details"}
                   </p>
                 </div>
-                <div className="space-y-3">
+                <div className="space-y-2.5">
                   {Object.entries(selectedItem).slice(0, 6).map(([key, value]) => (
-                    <div key={key} className="flex justify-between items-center pb-2 border-b">
-                      <span className="text-[13px] font-medium text-gray-500 capitalize">{key.replace(/([A-Z])/g, ' $1').trim()}</span>
-                      <span className="text-[14px] text-gray-900">{String(value)}</span>
+                    <div
+                      key={key}
+                      className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-6 border-b border-gray-100 pb-3"
+                    >
+                      <span className="text-[13px] font-medium leading-5 text-gray-500 capitalize">
+                        {key.replace(/([A-Z])/g, ' $1').trim()}
+                      </span>
+                      <span className="text-[14px] leading-5 text-right text-gray-900">
+                        {String(value)}
+                      </span>
                     </div>
                   ))}
                 </div>

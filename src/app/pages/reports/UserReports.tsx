@@ -64,7 +64,7 @@ export function UserReports() {
 
   // Use the API hook for User Reports
   const { data, isLoading, error, refetch } = useApi<any>(
-    `/api/admin/v1/reports/user`
+    `/api/admin/v1/reports/users`
   );
 
   const recentReports = data?.recentReports || [];
@@ -622,4 +622,4 @@ export function UserReports() {
       </Dialog>
     </div>
   );
-}
+}

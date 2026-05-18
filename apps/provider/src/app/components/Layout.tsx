@@ -2,10 +2,16 @@ import { Outlet, Link, useLocation } from 'react-router';
 import { Home, Calendar, DollarSign, MessageSquare, Settings, BarChart3, Bell, User, Menu, Star, Search, HelpCircle, TrendingUp, Briefcase } from 'lucide-react';
 import { useState } from 'react';
 import logo from '@/assets/d5c1631be6e8531539bd8040a765725f4a4ddc2c.png';
+import { useProviderData } from '../context/ProviderDataContext';
 
 export function Layout() {
   const location = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const { providerData } = useProviderData();
+  const unreadCount = 3;
+
+  const providerName = providerData?.profile?.businessName || 'Service Provider';
 
   const navSections = [
     {
@@ -57,7 +63,7 @@ export function Layout() {
             </button>
             <img src={logo} alt="ServEase" className="h-8" />
             <div className="hidden md:block ml-4">
-              <p className="text-lg font-semibold text-gray-900">Welcome back, Sarah Johnson</p>
+              <p className="text-lg font-semibold text-gray-900">Welcome back, {providerName}</p>
             </div>
           </div>
           
@@ -72,17 +78,54 @@ export function Layout() {
               />
             </div>
 
-            <button className="relative p-2 hover:bg-gray-100 rounded-lg transition-colors">
-              <Bell className="w-6 h-6 text-gray-600" />
-              <span className="absolute top-1 right-1 w-2 h-2 bg-green-600 rounded-full"></span>
-            </button>
+            <div className="relative">
+              <button 
+                className="relative p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                onClick={() => setShowNotifications(!showNotifications)}
+              >
+                <Bell className="w-6 h-6 text-gray-600" />
+                {unreadCount > 0 && (
+                  <span className="absolute top-1 right-1 w-2 h-2 bg-green-600 rounded-full"></span>
+                )}
+              </button>
+              
+              {showNotifications && (
+                <>
+                  <div className="fixed inset-0 z-10" onClick={() => setShowNotifications(false)} />
+                  <div className="absolute right-0 mt-2 w-80 bg-white rounded-xl shadow-xl border border-gray-200 z-20 overflow-hidden">
+                    <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between bg-gray-50">
+                      <div>
+                        <h3 className="text-sm font-semibold text-gray-900">Notifications</h3>
+                        <p className="text-xs text-gray-400">{unreadCount} unread</p>
+                      </div>
+                      <button className="text-xs text-green-600 hover:text-green-700 font-medium">
+                        Mark all read
+                      </button>
+                    </div>
+
+                    <div className="max-h-80 overflow-y-auto divide-y divide-gray-50">
+                      {/* Static Notifications */}
+                      <button className="w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors bg-green-50/50">
+                        <div className="flex items-start gap-3">
+                          <div className="w-2 h-2 rounded-full mt-2 flex-shrink-0 bg-green-600" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-gray-900">New Booking Request</p>
+                            <p className="text-xs text-gray-500 mt-0.5">You have a new booking from Maria D.</p>
+                          </div>
+                        </div>
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
             
             <div className="flex items-center gap-3 pl-4 border-l border-gray-200">
               <div className="w-10 h-10 rounded-full bg-gradient-to-br from-green-100 to-green-50 flex items-center justify-center ring-2 ring-green-100">
                 <User className="w-5 h-5 text-green-600" />
               </div>
               <div className="hidden md:block">
-                <p className="text-sm font-bold text-gray-900">Sarah Johnson</p>
+                <p className="text-sm font-bold text-gray-900">{providerName}</p>
                 <p className="text-xs text-gray-500">Service Provider</p>
               </div>
             </div>

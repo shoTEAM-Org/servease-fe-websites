@@ -66,6 +66,7 @@ interface ProviderDataContextType {
 const ProviderDataContext = createContext<ProviderDataContextType | undefined>(undefined);
 
 export function ProviderDataProvider({ children }: { children: ReactNode }) {
+
   const [providerData, setProviderData] = useState<ProviderData>({
     blockedDates: ["2026-03-25", "2026-03-26"],
     portfolioItems: [
@@ -183,6 +184,8 @@ export function ProviderDataProvider({ children }: { children: ReactNode }) {
     },
   });
 
+
+
   const addBlockedDates = (dates: string[]) => {
     setProviderData((prev) => ({
       ...prev,
@@ -203,6 +206,8 @@ export function ProviderDataProvider({ children }: { children: ReactNode }) {
       profile: { ...prev.profile, ...updates },
     }));
   };
+
+
 
   return (
     <ProviderDataContext.Provider

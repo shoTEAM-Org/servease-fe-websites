@@ -188,7 +188,7 @@ export function ProviderProfilePage() {
                     letterSpacing: "-0.025em",
                   }}
                 >
-                  Juan Dela Cruz
+                  {providerData.profile.businessName || "Juan Dela Cruz"}
                 </h1>
                 
                 {/* Additional Info - Location, Rating, Completed Jobs */}

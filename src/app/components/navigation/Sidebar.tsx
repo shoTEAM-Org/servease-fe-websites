@@ -34,6 +34,7 @@ import {
   Wallet,
 } from "lucide-react";
 import logo from "../../../assets/serveaselogo.png";
+import { useTranslation } from "../../contexts/LanguageContext";
 
 interface SidebarItemProps {
   item: {
@@ -55,7 +56,7 @@ function SidebarItem({ item, isCollapsed }: SidebarItemProps) {
           `flex items-center gap-3 px-3 py-2 rounded-lg transition-colors group relative ${
             isActive
               ? "bg-[#00BF63] text-white"
-              : "text-gray-700 hover:bg-[#DCFCE7] hover:text-[#15803D]"
+              : "text-foreground hover:bg-[#DCFCE7] hover:text-[#15803D]"
           }`
         }
         title={isCollapsed ? item.label : undefined}
@@ -86,71 +87,73 @@ interface SidebarProps {
 }
 
 export function Sidebar({ isCollapsed, onToggle }: SidebarProps) {
+  const { t } = useTranslation();
+
   const sections = [
     {
-      title: "Dashboard",
+      title: t("sidebar.dashboard"),
       items: [
-        { to: "/dashboard", icon: LayoutDashboard, label: "Overview", end: true },
+        { to: "/dashboard", icon: LayoutDashboard, label: t("sidebar.overview"), end: true },
       ],
     },
     {
-      title: "User Management",
+      title: t("sidebar.userManagement"),
       items: [
-        { to: "/customers",             icon: Users,         label: "Customers" },
-        { to: "/service-providers",     icon: UserCheck,     label: "Service Providers" },
-        { to: "/provider-applications", icon: UserPlus,      label: "Approval Queue" },
+        { to: "/customers",             icon: Users,         label: t("sidebar.customers") },
+        { to: "/service-providers",     icon: UserCheck,     label: t("sidebar.serviceProviders") },
+        { to: "/provider-applications", icon: UserPlus,      label: t("sidebar.approvalQueue") },
       ],
     },
     {
-      title: "Operations",
+      title: t("sidebar.operations"),
       items: [
-        { to: "/bookings",          icon: Package,       label: "All Bookings" },
-        { to: "/ongoing-services",  icon: ClipboardList, label: "Ongoing Services" },
-        { to: "/disputes",          icon: LifeBuoy,      label: "Disputes" },
-        { to: "/support",           icon: HelpCircle,    label: "Support" },
+        { to: "/bookings",          icon: Package,       label: t("sidebar.allBookings") },
+        { to: "/ongoing-services",  icon: ClipboardList, label: t("sidebar.ongoingServices") },
+        { to: "/disputes",          icon: LifeBuoy,      label: t("sidebar.disputes") },
+        { to: "/support",           icon: HelpCircle,    label: t("sidebar.support") },
       ],
     },
     {
-      title: "Finance",
+      title: t("sidebar.finance"),
       items: [
-        { to: "/transactions",      icon: CreditCard,  label: "Transactions" },
-        { to: "/provider-earnings", icon: Wallet,      label: "Provider Earnings" },
-        { to: "/payout-requests",   icon: TrendingUp,  label: "Payout Requests" },
-        { to: "/refund-management", icon: RefreshCw,   label: "Refund Management" },
-        { to: "/failed-payments",   icon: AlertCircle, label: "Failed Payments" },
+        { to: "/transactions",      icon: CreditCard,  label: t("sidebar.transactions") },
+        { to: "/provider-earnings", icon: Wallet,      label: t("sidebar.providerEarnings") },
+        { to: "/payout-requests",   icon: TrendingUp,  label: t("sidebar.payoutRequests") },
+        { to: "/refund-management", icon: RefreshCw,   label: t("sidebar.refundManagement") },
+        { to: "/failed-payments",   icon: AlertCircle, label: t("sidebar.failedPayments") },
       ],
     },
     {
-      title: "Marketplace & Marketing",
+      title: t("sidebar.marketplaceMarketing"),
       items: [
-        { to: "/categories",    icon: Grid3x3,    label: "Categories" },
-        { to: "/services",      icon: ShoppingBag, label: "Services" },
-        { to: "/service-areas", icon: MapPin,      label: "Service Areas" },
-        { to: "/promotions",    icon: Tag,         label: "Promotions" },
-        { to: "/broadcasts",    icon: Megaphone,   label: "Broadcasts" },
+        { to: "/categories",    icon: Grid3x3,    label: t("sidebar.categories") },
+        { to: "/services",      icon: ShoppingBag, label: t("sidebar.services") },
+        { to: "/service-areas", icon: MapPin,      label: t("sidebar.serviceAreas") },
+        { to: "/promotions",    icon: Tag,         label: t("sidebar.promotions") },
+        { to: "/broadcasts",    icon: Megaphone,   label: t("sidebar.broadcasts") },
       ],
     },
     {
-      title: "Reports & Analytics",
+      title: t("sidebar.reportsAnalytics"),
       items: [
-        { to: "/reports/revenue",           icon: BarChart3,   label: "Revenue" },
-        { to: "/reports/booking-analytics", icon: PieChart,    label: "Booking Analytics" },
-        { to: "/reports/business",          icon: Briefcase,   label: "Business Reports" },
-        { to: "/reports/financial",         icon: DollarSign,  label: "Financial Reports" },
-        { to: "/reports/user",              icon: Users,       label: "User Reports" },
-        { to: "/reports/performance",       icon: Activity,    label: "Performance Reports" },
-        { to: "/reports/compliance",        icon: CheckSquare, label: "Compliance Reports" },
+        { to: "/reports/revenue",           icon: BarChart3,   label: t("sidebar.revenue") },
+        { to: "/reports/booking-analytics", icon: PieChart,    label: t("sidebar.bookingAnalytics") },
+        { to: "/reports/business",          icon: Briefcase,   label: t("sidebar.businessReports") },
+        { to: "/reports/financial",         icon: DollarSign,  label: t("sidebar.financialReports") },
+        { to: "/reports/user",              icon: Users,       label: t("sidebar.userReports") },
+        { to: "/reports/performance",       icon: Activity,    label: t("sidebar.performanceReports") },
+        { to: "/reports/compliance",        icon: CheckSquare, label: t("sidebar.complianceReports") },
       ],
     },
     {
-      title: "Platform Settings",
+      title: t("sidebar.platformSettings"),
       items: [
-        { to: "/commission-rules",       icon: Percent,    label: "Commission" },
-        { to: "/admin-roles",            icon: Shield,     label: "Admin Roles & Permissions" },
-        { to: "/security-settings",      icon: Settings,   label: "Security Settings" },
-        { to: "/notification-settings",  icon: Bell,       label: "Notification Settings" },
-        { to: "/audit-trail",            icon: FileText,   label: "Logs & Audit Trail" },
-        { to: "/integrations",           icon: Plug,       label: "Integrations" },
+        { to: "/commission-rules",       icon: Percent,    label: t("sidebar.commission") },
+        { to: "/admin-roles",            icon: Shield,     label: t("sidebar.adminRolesPermissions") },
+        { to: "/security-settings",      icon: Settings,   label: t("sidebar.securitySettings") },
+        { to: "/notification-settings",  icon: Bell,       label: t("sidebar.notificationSettings") },
+        { to: "/audit-trail",            icon: FileText,   label: t("sidebar.logsAuditTrail") },
+        { to: "/integrations",           icon: Plug,       label: t("sidebar.integrations") },
       ],
     },
   ];
@@ -158,13 +161,13 @@ export function Sidebar({ isCollapsed, onToggle }: SidebarProps) {
   return (
     <aside
       className={`
-        fixed top-0 left-0 h-screen bg-white border-r border-gray-200 z-20 flex flex-col
+        fixed top-0 left-0 h-screen bg-card border-r border-border z-20 flex flex-col
         transition-all duration-300 ease-in-out
         ${isCollapsed ? "w-20" : "w-64"}
       `}
     >
       {/* Logo */}
-      <div className="p-6 border-b border-gray-200 flex-shrink-0">
+      <div className="p-6 border-b border-border flex-shrink-0">
         {!isCollapsed && (
           <div className="flex flex-col items-center gap-2">
             <img
@@ -172,7 +175,7 @@ export function Sidebar({ isCollapsed, onToggle }: SidebarProps) {
               alt="ServEase"
               className="h-8 w-auto"
             />
-            <p className="text-xs text-gray-500 whitespace-nowrap">Admin Dashboard</p>
+            <p className="text-xs text-muted-foreground whitespace-nowrap">{t("sidebar.adminDashboard")}</p>
           </div>
         )}
       </div>
@@ -182,12 +185,12 @@ export function Sidebar({ isCollapsed, onToggle }: SidebarProps) {
         {sections.map((section, index) => (
           <div key={index} className="mb-6">
             {!isCollapsed && (
-              <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 px-3">
+              <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 px-3">
                 {section.title}
               </h3>
             )}
             {isCollapsed && (
-              <div className="h-px bg-gray-200 mb-2" />
+              <div className="h-px bg-border mb-2" />
             )}
             <ul className="space-y-1">
               {section.items.map((item) => (
@@ -203,18 +206,18 @@ export function Sidebar({ isCollapsed, onToggle }: SidebarProps) {
       </nav>
 
       {/* Toggle Button */}
-      <div className="p-4 border-t border-gray-200 flex-shrink-0">
+      <div className="p-4 border-t border-border flex-shrink-0">
         <button
           onClick={onToggle}
-          className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-gray-700 hover:bg-[#DCFCE7] hover:text-[#15803D] transition-colors"
-          title={isCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
+          className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-foreground hover:bg-[#DCFCE7] hover:text-[#15803D] transition-colors"
+          title={isCollapsed ? t("sidebar.expandSidebar") : t("sidebar.collapseSidebar")}
         >
           {isCollapsed ? (
             <PanelLeft className="w-5 h-5" />
           ) : (
             <>
               <PanelLeftClose className="w-5 h-5" />
-              <span className="text-sm font-medium">Collapse</span>
+              <span className="text-sm font-medium">{t("sidebar.collapse")}</span>
             </>
           )}
         </button>

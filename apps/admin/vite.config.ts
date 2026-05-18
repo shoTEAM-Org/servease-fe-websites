@@ -23,5 +23,13 @@ export default defineConfig({
 
   // File types to support raw imports. Never add .css, .tsx, or .ts files to this.
   // vite.config.ts
-assetsInclude: ['**/*.svg', '**/*.csv', '**/*.png'],
+  assetsInclude: ['**/*.svg', '**/*.csv', '**/*.png'],
+  server: {
+    proxy: {
+      '/api': {
+        target: 'http://localhost:5000',
+        changeOrigin: true,
+      },
+    },
+  },
 })
