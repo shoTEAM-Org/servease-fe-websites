@@ -1,4 +1,6 @@
 import { Link, useNavigate } from "react-router";
+import { useState, useEffect } from "react";
+import { apiFetch } from "../../services/api";
 import { 
   User, 
   Mail, 
@@ -136,6 +138,20 @@ const loginHistory = [
 
 export function AdminProfile() {
   const navigate = useNavigate();
+  const [profileData, setProfileData] = useState<Record<string, unknown> | null>(null);
+
+  useEffect(() => {
+    apiFetch('/api/admin/v1/account/profile')
+      .then(res => setProfileData(((res as Record<string, unknown>)?.profile ?? res) as Record<string, unknown>))
+      .catch(() => {});
+  }, []);
+
+  const profile = profileData ? {
+    ...adminProfile,
+    name: String(profileData.full_name ?? profileData.name ?? adminProfile.name),
+    email: String(profileData.email ?? adminProfile.email),
+    phone: String(profileData.contact_number ?? profileData.phone ?? adminProfile.phone),
+  } : adminProfile;
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -196,8 +212,8 @@ export function AdminProfile() {
               <div className="flex flex-col items-center">
                 <div className="relative">
                   <img
-                    src={adminProfile.profilePhoto}
-                    alt={adminProfile.name}
+                    src={profile.profilePhoto}
+                    alt={profile.name}
                     className="w-32 h-32 rounded-full border-4 border-gray-100"
                   />
                   <button className="absolute bottom-0 right-0 bg-white rounded-full p-2 shadow-lg border border-gray-200 hover:bg-gray-50 transition-colors">
@@ -205,25 +221,25 @@ export function AdminProfile() {
                   </button>
                 </div>
                 <h2 className="text-xl font-semibold text-gray-900 mt-4">
-                  {adminProfile.name}
+                  {profile.name}
                 </h2>
-                <Badge className={`mt-2 ${adminProfile.roleColor}`}>
-                  {adminProfile.role}
+                <Badge className={`mt-2 ${profile.roleColor}`}>
+                  {profile.role}
                 </Badge>
               </div>
 
               <div className="mt-6 space-y-4">
                 <div className="flex items-center gap-3 text-sm">
                   <Mail className="w-4 h-4 text-gray-400" />
-                  <span className="text-gray-700">{adminProfile.email}</span>
+                  <span className="text-gray-700">{profile.email}</span>
                 </div>
                 <div className="flex items-center gap-3 text-sm">
                   <Phone className="w-4 h-4 text-gray-400" />
-                  <span className="text-gray-700">{adminProfile.phone}</span>
+                  <span className="text-gray-700">{profile.phone}</span>
                 </div>
                 <div className="flex items-center gap-3 text-sm">
                   <Shield className="w-4 h-4 text-gray-400" />
-                  <span className="text-gray-700">{adminProfile.role}</span>
+                  <span className="text-gray-700">{profile.role}</span>
                 </div>
               </div>
 
@@ -233,7 +249,7 @@ export function AdminProfile() {
                   <div className="flex-1">
                     <div className="text-sm text-gray-500">Account Created</div>
                     <div className="text-base font-semibold text-gray-900 mt-0.5">
-                      {formatDate(adminProfile.accountCreated)}
+                      {formatDate(profile.accountCreated)}
                     </div>
                   </div>
                 </div>
@@ -242,7 +258,7 @@ export function AdminProfile() {
                   <div className="flex-1">
                     <div className="text-sm text-gray-500">Last Login</div>
                     <div className="text-base font-semibold text-gray-900 mt-0.5">
-                      {formatDateTime(adminProfile.lastLogin)}
+                      {formatDateTime(profile.lastLogin)}
                     </div>
                   </div>
                 </div>
@@ -261,7 +277,7 @@ export function AdminProfile() {
             <CardContent>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  {adminProfile.twoFactorEnabled ? (
+                  {profile.twoFactorEnabled ? (
                     <>
                       <CheckCircle2 className="w-5 h-5 text-green-600" />
                       <span className="text-sm font-medium text-green-700">Enabled</span>
@@ -278,7 +294,7 @@ export function AdminProfile() {
                   size="sm"
                   onClick={() => {/* Toggle 2FA handler */}}
                 >
-                  {adminProfile.twoFactorEnabled ? "Disable" : "Enable"}
+                  {profile.twoFactorEnabled ? "Disable" : "Enable"}
                 </Button>
               </div>
               <p className="text-xs text-gray-500 mt-3">
@@ -327,7 +343,7 @@ export function AdminProfile() {
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-2 gap-3">
-                {adminProfile.permissions.map((permission, index) => (
+                {profile.permissions.map((permission, index) => (
                   <div
                     key={index}
                     className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded-lg"
@@ -341,7 +357,7 @@ export function AdminProfile() {
               </div>
               <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
                 <p className="text-xs text-blue-700">
-                  <strong>Note:</strong> As a {adminProfile.role}, you have unrestricted access to all platform features and settings.
+                  <strong>Note:</strong> As a {profile.role}, you have unrestricted access to all platform features and settings.
                 </p>
               </div>
             </CardContent>

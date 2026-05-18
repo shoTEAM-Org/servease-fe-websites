@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { apiFetch } from "../../services/api";
 import { createPortal } from "react-dom";
 import { useNavigate, useParams } from "react-router";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
@@ -153,7 +154,31 @@ const TAB_EMPTY_ICONS: Record<string, React.ReactNode> = {
 export function ProviderApplicationReview() {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
-  const application = id ? mockApplications[id] : null;
+  const [fetchedApp, setFetchedApp] = useState<Record<string, unknown> | null>(null);
+
+  useEffect(() => {
+    if (!id) return;
+    apiFetch<Record<string, unknown>>(`/api/admin/v1/users/provider-applications/${id}`)
+      .then(res => setFetchedApp((res?.application ?? res) as Record<string, unknown>))
+      .catch(() => {});
+  }, [id]);
+
+  const fallback = id ? mockApplications[id] : null;
+  const application = fetchedApp ? {
+    ...fallback,
+    applicationId: String(fetchedApp.id ?? fallback?.applicationId ?? id),
+    businessName: String(fetchedApp.business_name ?? fetchedApp.full_name ?? fallback?.businessName ?? ''),
+    ownerName: String(fetchedApp.full_name ?? fallback?.ownerName ?? ''),
+    category: String(fetchedApp.service_category ?? fallback?.category ?? ''),
+    dateApplied: String(fetchedApp.created_at ?? fallback?.dateApplied ?? ''),
+    location: String(fetchedApp.location ?? fallback?.location ?? ''),
+    riskLevel: (fallback?.riskLevel ?? 'low') as 'low' | 'medium' | 'high',
+    flags: fallback?.flags ?? [],
+    govIdNumber: String(fetchedApp.gov_id_number ?? fallback?.govIdNumber ?? ''),
+    govIdType: String(fetchedApp.gov_id_type ?? fallback?.govIdType ?? 'PhilSys National ID'),
+    ocrConfidence: fallback?.ocrConfidence ?? 0,
+    notes: fallback?.notes ?? [],
+  } : fallback;
 
   const [activeTab, setActiveTab] = useState("Documents");
   const [flagsExpanded, setFlagsExpanded] = useState(true);
@@ -744,7 +769,13 @@ export function ProviderApplicationReview() {
           </div>
           <DialogFooter className="gap-2">
             <Button variant="outline" onClick={() => setShowApproveModal(false)}>Cancel</Button>
-            <Button className="bg-[#16A34A] hover:bg-[#15803D] gap-2" onClick={() => { setShowApproveModal(false); navigate("/approval-queue"); }}>
+            <Button className="bg-[#16A34A] hover:bg-[#15803D] gap-2" onClick={() => {
+              setShowApproveModal(false);
+              apiFetch(`/api/admin/v1/users/provider-applications/${id}/status`, {
+                method: 'PATCH',
+                body: JSON.stringify({ status: 'approved' }),
+              }).catch(() => {}).finally(() => navigate("/approval-queue"));
+            }}>
               <CheckCircle className="w-4 h-4" />Confirm Approval
             </Button>
           </DialogFooter>
@@ -768,7 +799,13 @@ export function ProviderApplicationReview() {
           </div>
           <DialogFooter className="gap-2">
             <Button variant="outline" onClick={() => setShowRejectModal(false)}>Cancel</Button>
-            <Button variant="destructive" disabled={!rejectionReason.trim()} onClick={() => { setShowRejectModal(false); navigate("/approval-queue"); }} className="gap-2">
+            <Button variant="destructive" disabled={!rejectionReason.trim()} onClick={() => {
+              setShowRejectModal(false);
+              apiFetch(`/api/admin/v1/users/provider-applications/${id}/status`, {
+                method: 'PATCH',
+                body: JSON.stringify({ status: 'rejected', reject_reason: rejectionReason }),
+              }).catch(() => {}).finally(() => navigate("/approval-queue"));
+            }} className="gap-2">
               <XCircle className="w-4 h-4" />Confirm Rejection
             </Button>
           </DialogFooter>

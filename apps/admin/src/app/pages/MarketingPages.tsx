@@ -22,13 +22,7 @@ import {
 
 // ── Promo Codes ─────────────────────────────────────────────────────────────
 
-const mockPromoCodes = [
-  { id: "PC-001", code: "WELCOME20", type: "Percentage", value: 20, used: 142, limit: 500, expires: "2026-04-30", status: "Active" },
-  { id: "PC-002", code: "SUMMER50", type: "Fixed", value: 50, used: 89, limit: 200, expires: "2026-05-31", status: "Active" },
-  { id: "PC-003", code: "NEWUSER15", type: "Percentage", value: 15, used: 300, limit: 300, expires: "2026-03-31", status: "Expired" },
-  { id: "PC-004", code: "FLASH100", type: "Fixed", value: 100, used: 0, limit: 50, expires: "2026-04-05", status: "Scheduled" },
-  { id: "PC-005", code: "LOYALTY10", type: "Percentage", value: 10, used: 57, limit: 1000, expires: "2026-12-31", status: "Active" },
-];
+const mockPromoCodes: { id: string; code: string; type: string; value: number; used: number; limit: number; expires: string; status: string }[] = [];
 
 const promoStats = [
   { label: "Active Promos", value: "3", icon: Tag, color: "text-emerald-600", bg: "bg-emerald-50" },
@@ -183,12 +177,7 @@ export function PromoCodes() {
 
 // ── Broadcasts ───────────────────────────────────────────────────────────────
 
-const mockBroadcasts = [
-  { id: "BC-001", title: "Platform Maintenance Notice", audience: "All Users", channel: "Push + Email", sent: 8420, opened: 5103, status: "Sent", date: "2026-03-28T09:00:00" },
-  { id: "BC-002", title: "New Feature: Live Tracking", audience: "Customers", channel: "Push", sent: 5200, opened: 3410, status: "Sent", date: "2026-03-25T14:00:00" },
-  { id: "BC-003", title: "Summer Promo Reminder", audience: "All Users", channel: "Email", sent: 0, opened: 0, status: "Scheduled", date: "2026-04-01T10:00:00" },
-  { id: "BC-004", title: "KYC Verification Reminder", audience: "Providers", channel: "Email + SMS", sent: 312, opened: 271, status: "Sent", date: "2026-03-20T08:30:00" },
-];
+const mockBroadcasts: { id: string; title: string; audience: string; channel: string; sent: number; opened: number; status: string; date: string }[] = [];
 
 const broadcastStats = [
   { label: "Total Sent", value: "14.2K", icon: Send, color: "text-blue-600", bg: "bg-blue-50" },

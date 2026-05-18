@@ -1,9 +1,11 @@
+import { useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { Switch } from "../components/ui/switch";
+import { apiFetch } from "../../services/api";
 import {
   Table,
   TableBody,
@@ -25,35 +27,7 @@ import { useNavigate } from "react-router";
 // Admin Roles & Permissions
 export function AdminRoles() {
   const navigate = useNavigate();
-  const admins = [
-    {
-      id: "ADM-001",
-      name: "Juan Dela Cruz",
-      email: "juan@servease.ph",
-      role: "Super Admin",
-      permissions: "Full Access",
-      lastLogin: "2026-03-04T14:30:00",
-      status: "Active",
-    },
-    {
-      id: "ADM-002",
-      name: "Maria Santos",
-      email: "maria@servease.ph",
-      role: "Finance Manager",
-      permissions: "Finance Only",
-      lastLogin: "2026-03-04T10:15:00",
-      status: "Active",
-    },
-    {
-      id: "ADM-003",
-      name: "Roberto Garcia",
-      email: "roberto@servease.ph",
-      role: "Support Manager",
-      permissions: "Operations Only",
-      lastLogin: "2026-03-03T16:45:00",
-      status: "Active",
-    },
-  ];
+  const admins: { id: string; name: string; email: string; role: string; permissions: string; lastLogin: string; status: string }[] = [];
 
   return (
     <div className="space-y-6">
@@ -193,6 +167,10 @@ export function AdminRoles() {
 
 // Notification Settings
 export function NotificationSettings() {
+  useEffect(() => {
+    apiFetch('/api/admin/v1/settings/notifications').catch(() => {});
+  }, []);
+
   return (
     <div className="space-y-6">
       <div>
@@ -335,6 +313,9 @@ export function NotificationSettings() {
 
 // Security Settings
 export function SecuritySettings() {
+  useEffect(() => {
+    apiFetch('/api/admin/v1/settings/security').catch(() => {});
+  }, []);
   return (
     <div className="space-y-6">
       <div>
@@ -424,68 +405,7 @@ export function SecuritySettings() {
 
 // Logs & Audit Trail
 export function AuditTrail() {
-  const auditLogs = [
-    {
-      id: "LOG-001",
-      action: "Commission Rate Updated",
-      user: "Juan Dela Cruz",
-      timestamp: "2026-03-04T14:30:00",
-      details: "Changed Beauty & Wellness commission from 18% to 20%",
-      ipAddress: "192.168.1.1",
-      entity: "Commission Settings",
-      actionType: "UPDATE",
-    },
-    {
-      id: "LOG-002",
-      action: "Dispute Resolved",
-      user: "Maria Santos",
-      timestamp: "2026-03-04T13:15:00",
-      details: "Approved refund for BK-2026-001789 (₱3,500)",
-      ipAddress: "192.168.1.2",
-      entity: "Dispute",
-      actionType: "RESOLVE",
-    },
-    {
-      id: "LOG-003",
-      action: "Provider Suspended",
-      user: "Juan Dela Cruz",
-      timestamp: "2026-03-04T11:45:00",
-      details: "Suspended PRV-005 (QuickFix Plumbing) due to low completion rate",
-      ipAddress: "192.168.1.1",
-      entity: "Service Provider",
-      actionType: "SUSPEND",
-    },
-    {
-      id: "LOG-004",
-      action: "Payout Approved",
-      user: "Maria Santos",
-      timestamp: "2026-03-04T10:20:00",
-      details: "Approved payout PAY-2026-123 (₱45,000) for PRV-001",
-      ipAddress: "192.168.1.2",
-      entity: "Payout",
-      actionType: "APPROVE",
-    },
-    {
-      id: "LOG-005",
-      action: "User Registered",
-      user: "System",
-      timestamp: "2026-03-04T09:15:00",
-      details: "New customer registered: CUST-2026-9876",
-      ipAddress: "192.168.1.5",
-      entity: "Customer",
-      actionType: "CREATE",
-    },
-    {
-      id: "LOG-006",
-      action: "Booking Created",
-      user: "System",
-      timestamp: "2026-03-04T08:30:00",
-      details: "New booking created: BK-2026-002456",
-      ipAddress: "192.168.1.6",
-      entity: "Booking",
-      actionType: "CREATE",
-    },
-  ];
+  const auditLogs: { id: string; action: string; user: string; timestamp: string; details: string; ipAddress: string; entity: string; actionType: string }[] = [];
 
   return (
     <div className="space-y-6">

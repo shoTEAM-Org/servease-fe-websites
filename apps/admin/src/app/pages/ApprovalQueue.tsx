@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { apiFetch } from "../../services/api";
 import { useNavigate } from "react-router";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Badge } from "../components/ui/badge";
@@ -28,129 +29,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../components/ui/select";
-
-const applications = [
-  {
-    applicationId: "APP-2026-0234",
-    businessName: "Tutor Excellence Hub",
-    ownerName: "Roberto Miguel Cruz",
-    category: "Education & Professional Services",
-    dateApplied: "2026-03-01",
-    location: "Taguig City, Metro Manila",
-    status: "pending",
-    providerId: "SE-ED-003",
-  },
-  {
-    applicationId: "APP-2026-0235",
-    businessName: "Wellness Massage Therapy",
-    ownerName: "Carmen Grace Alvarez",
-    category: "Beauty Wellness & Personal Care",
-    dateApplied: "2026-03-03",
-    location: "Manila City, Metro Manila",
-    status: "pending",
-    providerId: "SE-BW-009",
-  },
-  {
-    applicationId: "APP-2026-0236",
-    businessName: "Prime Cleaning Solutions",
-    ownerName: "Fernando Jose Santos",
-    category: "Domestic & Cleaning Services",
-    dateApplied: "2026-03-02",
-    location: "Quezon City, Metro Manila",
-    status: "pending",
-    providerId: "SE-DC-016",
-  },
-  {
-    applicationId: "APP-2026-0237",
-    businessName: "AutoCare Express",
-    ownerName: "Leonardo David Reyes",
-    category: "Automotive & Tech Support",
-    dateApplied: "2026-03-04",
-    location: "Makati City, Metro Manila",
-    status: "pending",
-    providerId: "SE-AT-017",
-  },
-  {
-    applicationId: "APP-2026-0238",
-    businessName: "PetCare Veterinary Services",
-    ownerName: "Victoria Anne Lopez",
-    category: "Pet Services",
-    dateApplied: "2026-03-03",
-    location: "Pasig City, Metro Manila",
-    status: "pending",
-    providerId: "SE-PS-018",
-  },
-  {
-    applicationId: "APP-2026-0239",
-    businessName: "EventMasters Pro",
-    ownerName: "Christopher James Diaz",
-    category: "Events & Entertainment",
-    dateApplied: "2026-03-01",
-    location: "Pasay City, Metro Manila",
-    status: "pending",
-    providerId: "SE-EE-019",
-  },
-  {
-    applicationId: "APP-2026-0240",
-    businessName: "HandyFix Home Services",
-    ownerName: "Michelle Anne Garcia",
-    category: "Home Maintenance & Repair",
-    dateApplied: "2026-03-02",
-    location: "Mandaluyong City, Metro Manila",
-    status: "pending",
-    providerId: "SE-HM-020",
-  },
-  {
-    applicationId: "APP-2026-0228",
-    businessName: "ElectroPro Electricians",
-    ownerName: "Antonio Carlos Rivera",
-    category: "Home Maintenance & Repair",
-    dateApplied: "2024-01-20",
-    location: "Malabon City, Metro Manila",
-    status: "approved",
-    providerId: "SE-HM-015",
-  },
-  {
-    applicationId: "APP-2026-0215",
-    businessName: "HomeFixPro Manila",
-    ownerName: "Juan Carlos Reyes",
-    category: "Home Maintenance & Repair",
-    dateApplied: "2024-01-10",
-    location: "Makati City, Metro Manila",
-    status: "approved",
-    providerId: "SE-HM-001",
-  },
-  {
-    applicationId: "APP-2026-0221",
-    businessName: "Glow Beauty Spa",
-    ownerName: "Maria Elena Santos",
-    category: "Beauty Wellness & Personal Care",
-    dateApplied: "2024-02-15",
-    location: "Quezon City, Metro Manila",
-    status: "approved",
-    providerId: "SE-BW-002",
-  },
-  {
-    applicationId: "APP-2026-0198",
-    businessName: "QuickTech Repairs",
-    ownerName: "Santiago Miguel Torres",
-    category: "Automotive & Tech Support",
-    dateApplied: "2023-12-05",
-    location: "Valenzuela City, Metro Manila",
-    status: "rejected",
-    providerId: "SE-AT-021",
-  },
-  {
-    applicationId: "APP-2026-0205",
-    businessName: "CleanSwift Services",
-    ownerName: "Angelica Rose Mendoza",
-    category: "Domestic & Cleaning Services",
-    dateApplied: "2024-01-08",
-    location: "Paranaque City, Metro Manila",
-    status: "rejected",
-    providerId: "SE-DC-022",
-  },
-];
 
 const stats = [
   {
@@ -184,6 +62,27 @@ export function ApprovalQueue() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("pending");
   const [categoryFilter, setCategoryFilter] = useState("all");
+  const [applications, setApplications] = useState<any[]>([]);
+
+  useEffect(() => {
+    apiFetch<Record<string, unknown>>('/api/admin/v1/users/provider-applications?limit=100')
+      .then(res => {
+        const raw = Array.isArray(res?.applications) ? res.applications
+          : Array.isArray(res?.data) ? res.data
+          : Array.isArray(res) ? res : [];
+        setApplications((raw as any[]).map((a: any) => ({
+          applicationId: a.id ?? a.applicationId ?? '',
+          businessName: a.business_name ?? a.businessName ?? a.full_name ?? '',
+          ownerName: a.full_name ?? a.ownerName ?? '',
+          category: a.service_category ?? a.category ?? '',
+          dateApplied: a.created_at ?? a.dateApplied ?? '',
+          location: a.location ?? a.city ?? '',
+          status: a.verification_status ?? a.status ?? 'pending',
+          providerId: a.user_id ?? a.providerId ?? a.id ?? '',
+        })));
+      })
+      .catch(() => setApplications([]));
+  }, []);
 
   let filteredApplications = applications.filter((app) => {
     const matchesSearch =

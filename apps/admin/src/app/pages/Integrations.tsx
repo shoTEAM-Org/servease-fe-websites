@@ -1,3 +1,5 @@
+import { useEffect } from "react";
+import { apiFetch } from "../../services/api";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -15,6 +17,10 @@ import {
 } from "lucide-react";
 
 export function Integrations() {
+  useEffect(() => {
+    apiFetch('/api/admin/v1/settings/integrations').catch(() => {});
+  }, []);
+
   return (
     <div className="space-y-6">
       <div>
