@@ -14,6 +14,9 @@ export default defineConfig({
     react(),
     tailwindcss(),
   ],
+  server: {
+    port: 5000,
+  },
   resolve: {
     alias: {
       // Alias @ to the src directory
@@ -22,6 +25,5 @@ export default defineConfig({
   },
 
   // File types to support raw imports. Never add .css, .tsx, or .ts files to this.
-  // vite.config.ts
-assetsInclude: ['**/*.svg', '**/*.csv', '**/*.png'],
+  assetsInclude: ['**/*.svg', '**/*.csv', '**/*.png'],
 })
