@@ -43,6 +43,7 @@ import {
 import { toast } from "sonner";
 import { Skeleton } from "../../components/ui/skeleton";
 import { useApi, apiCall } from "../../../hooks/useApi";
+import { datedFileName, exportSectionsToPdf } from "../../utils/exportFiles";
 
 export function FinancialReports() {
   const [isGenerateModalOpen, setIsGenerateModalOpen] = useState(false);
@@ -136,8 +137,23 @@ export function FinancialReports() {
     }
   };
 
-  const handleDownloadReport = (reportName: string) => {
-    toast.success(`Downloading ${reportName}...`);
+  const handleDownloadReport = (report: any) => {
+    exportSectionsToPdf(
+      datedFileName(String(report.name || "financial-report").toLowerCase().replace(/[^a-z0-9]+/g, "-"), "pdf"),
+      report.name || "Financial Report",
+      [
+        {
+          headers: ["Report Name", "Generated Date", "Format", "Size"],
+          rows: [[
+            report.name,
+            report.generatedDate ? new Date(report.generatedDate).toLocaleString("en-US") : "",
+            report.format,
+            report.size,
+          ]],
+        },
+      ]
+    );
+    toast.success(`Downloaded ${report.name}`);
   };
 
   if (error) {
@@ -325,9 +341,9 @@ export function FinancialReports() {
                           <Button size="sm" variant="outline">
                             <Edit2 className="w-3 h-3" />
                           </Button>
-                          <Button 
-                            size="sm" 
-                            variant="outline" 
+                          <Button
+                            size="sm"
+                            variant="outline"
                             onClick={() => handleToggleSchedule(schedule.id, schedule.status)}
                             className={
                               schedule.status === "Active"
@@ -399,7 +415,7 @@ export function FinancialReports() {
                       <TableCell className="text-right">
                         <Button
                           size="sm"
-                          onClick={() => handleDownloadReport(report.name)}
+                          onClick={() => handleDownloadReport(report)}
                           className="bg-[#00BF63] hover:bg-[#00A055]"
                         >
                           <Download className="w-3 h-3 mr-2" />
@@ -622,4 +638,4 @@ export function FinancialReports() {
       </Dialog>
     </div>
   );
-}
+}

@@ -20,6 +20,7 @@ import {
   Legend,
   ResponsiveContainer,
 } from "recharts";
+import { datedFileName, exportSectionsToPdf } from "../utils/exportFiles";
 
 const stats = [
   {
@@ -102,6 +103,33 @@ const pendingSettlements = [
 ];
 
 export function Finance() {
+  const handleExportReport = () => {
+    exportSectionsToPdf(datedFileName("finance-report", "pdf"), "Finance Report", [
+      {
+        title: "Summary",
+        headers: ["Metric", "Value", "Change"],
+        rows: stats.map((stat) => [stat.title, stat.value, stat.change]),
+      },
+      {
+        title: "Revenue Trend",
+        headers: ["Month", "Revenue", "Commission"],
+        rows: revenueData.map((row) => [row.month, row.revenue, row.commission]),
+      },
+      {
+        title: "Pending Settlements",
+        headers: ["ID", "Seller", "Module", "Amount", "Due Date", "Status"],
+        rows: pendingSettlements.map((settlement) => [
+          settlement.id,
+          settlement.seller,
+          settlement.module,
+          settlement.amount,
+          settlement.dueDate,
+          settlement.status,
+        ]),
+      },
+    ]);
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -111,7 +139,7 @@ export function Finance() {
             Manage payments, commissions, and financial reports
           </p>
         </div>
-        <Button>
+        <Button onClick={handleExportReport}>
           <Download className="w-4 h-4 mr-2" />
           Export Report
         </Button>

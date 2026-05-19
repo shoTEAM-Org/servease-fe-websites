@@ -28,6 +28,7 @@ import {
   AlertCircle,
   Download,
 } from "lucide-react";
+import { datedFileName, exportSectionsToPdf } from "../utils/exportFiles";
 
 interface Settlement {
   id: string;
@@ -307,6 +308,27 @@ export function SettlementsPayouts() {
     });
   };
 
+  const handleExportReport = () => {
+    exportSectionsToPdf(datedFileName("settlements-payouts-report", "pdf"), "Settlements & Payouts Report", [
+      {
+        title: "Settlements",
+        headers: ["Settlement ID", "Provider", "Category", "Amount", "Request Date", "Due Date", "Bank Account", "Account Name", "Transactions", "Status"],
+        rows: filteredSettlements.map((settlement) => [
+          settlement.id,
+          settlement.providerName,
+          settlement.serviceCategory,
+          settlement.amount,
+          settlement.requestDate,
+          settlement.dueDate,
+          settlement.bankAccount,
+          settlement.accountName,
+          settlement.transactionCount,
+          settlement.status,
+        ]),
+      },
+    ]);
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -316,7 +338,7 @@ export function SettlementsPayouts() {
             Review and process settlement requests from service providers
           </p>
         </div>
-        <Button>
+        <Button onClick={handleExportReport}>
           <Download className="w-4 h-4 mr-2" />
           Export Report
         </Button>

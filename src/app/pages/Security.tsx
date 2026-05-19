@@ -16,6 +16,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { toast } from "sonner";
+import { datedFileName, exportTextFile } from "../utils/exportFiles";
 
 export function Security() {
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
@@ -50,6 +51,28 @@ export function Security() {
     } else {
       toast.success("Two-factor authentication disabled");
     }
+  };
+
+  const handleDownloadBackupCodes = () => {
+    const codes = Array.from({ length: 10 }, () => {
+      const values = new Uint16Array(2);
+      crypto.getRandomValues(values);
+      return Array.from(values, (value) => value.toString(36).toUpperCase().padStart(4, "0").slice(0, 4))
+        .join("-");
+    });
+
+    exportTextFile(
+      datedFileName("servease-backup-codes", "txt"),
+      [
+        "ServEase Admin Backup Codes",
+        `Generated: ${new Date().toLocaleString()}`,
+        "",
+        ...codes,
+        "",
+        "Store these codes somewhere safe. Each code should only be used once.",
+      ].join("\n")
+    );
+    toast.success("Backup codes downloaded");
   };
 
   const activeSessions = [
@@ -248,7 +271,7 @@ export function Security() {
                 <p className="text-sm text-gray-500">
                   Download backup codes to access your account if you lose your device.
                 </p>
-                <Button variant="outline" className="w-full">
+                <Button variant="outline" className="w-full" onClick={handleDownloadBackupCodes}>
                   Download Backup Codes
                 </Button>
               </div>

@@ -48,6 +48,7 @@ import {
 import { Badge } from "../../components/ui/badge";
 import { Skeleton } from "../../components/ui/skeleton";
 import { useApi } from "../../../hooks/useApi";
+import { datedFileName, exportSectionsToCsv, exportSectionsToPdf } from "../../utils/exportFiles";
 
 function KPICard({ label, value, change, icon: Icon, changeType }: any) {
   return (
@@ -87,12 +88,28 @@ export function BookingAnalytics() {
     `/api/admin/v1/reports/booking-analytics?dateRange=${dateRange}&category=${categoryFilter}&area=${serviceAreaFilter}&status=${statusFilter}`
   );
 
-  const handleExportCSV = () => {
-    alert("✅ Exporting Booking Analytics data to CSV...");
+  const bookingExportSection = {
+    title: "Booking Analytics",
+    headers: ["Booking ID", "Scheduled Date", "Scheduled Time", "Customer", "Provider", "Category", "Service", "Status", "Amount"],
+    rows: (data?.bookingsList || []).map((booking: any) => [
+      booking.id,
+      booking.scheduledDate,
+      booking.scheduledTime,
+      booking.customer,
+      booking.provider,
+      booking.category,
+      booking.service,
+      booking.status,
+      booking.amount,
+    ]),
   };
 
-  const handleExportPDF = () => {
-    alert("✅ Exporting Booking Analytics data to PDF...");
+  const downloadCSV = () => {
+    exportSectionsToCsv(datedFileName("booking-analytics", "csv"), [bookingExportSection]);
+  };
+
+  const downloadPDF = () => {
+    exportSectionsToPdf(datedFileName("booking-analytics", "pdf"), "Booking Analytics", [bookingExportSection]);
   };
 
   const openDrawer = (item: any) => {
@@ -117,11 +134,11 @@ export function BookingAnalytics() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button onClick={handleExportCSV} variant="outline" className="text-[14px] font-medium">
+          <Button onClick={downloadCSV} variant="outline" className="text-[14px] font-medium">
             <Download className="w-4 h-4 mr-2" />
             Export CSV
           </Button>
-          <Button onClick={handleExportPDF} className="bg-[#00BF63] hover:bg-[#00A356] text-[14px] font-medium">
+          <Button onClick={downloadPDF} className="bg-[#00BF63] hover:bg-[#00A356] text-[14px] font-medium">
             <FileText className="w-4 h-4 mr-2" />
             Export PDF
           </Button>

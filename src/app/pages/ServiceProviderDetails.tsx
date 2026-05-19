@@ -50,6 +50,7 @@ import {
   ScanLine,
 } from "lucide-react";
 import { useData } from "../../contexts/DataContext";
+import { datedFileName, exportSectionsToPdf } from "../utils/exportFiles";
 
 /* ─── MOCK DATA ─────────────────────────────────────────────────── */
 const PROVIDERS: Record<string, {
@@ -422,6 +423,30 @@ export function ServiceProviderDetails() {
     setRotation(0);
     setZoomLevel(100);
     setShowDocModal(true);
+  };
+
+  const handleDownloadSelectedDoc = () => {
+    if (!selectedDoc || !provider) return;
+
+    exportSectionsToPdf(
+      datedFileName(`${provider.id.toLowerCase()}-${selectedDoc.id}`, "pdf"),
+      `${selectedDoc.name} - ${provider.businessName}`,
+      [
+        {
+          title: "Document Details",
+          headers: ["Field", "Value"],
+          rows: [
+            ["Provider ID", provider.id],
+            ["Provider", provider.businessName],
+            ["Owner", provider.ownerName],
+            ["Document", selectedDoc.name],
+            ["File", selectedDoc.file],
+            ["Uploaded", selectedDoc.date],
+            ["Verification Level", provider.verificationLevel],
+          ],
+        },
+      ]
+    );
   };
 
   useEffect(() => {
@@ -982,7 +1007,7 @@ export function ServiceProviderDetails() {
               <Button size="sm" variant="outline" className="gap-1.5 text-xs shrink-0" onClick={() => { setZoomLevel(100); setRotation(0); }}>
                 Reset
               </Button>
-              <Button size="sm" variant="outline" className="gap-1.5 text-xs shrink-0">
+              <Button size="sm" variant="outline" className="gap-1.5 text-xs shrink-0" onClick={handleDownloadSelectedDoc}>
                 <Download className="w-3 h-3" />Download
               </Button>
             </div>

@@ -43,6 +43,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { Badge } from "../../components/ui/badge";
+import { datedFileName, exportSectionsToCsv, exportSectionsToPdf } from "../../utils/exportFiles";
 
 // Revenue Data
 const revenueOverTimeData = [
@@ -305,12 +306,27 @@ export function Revenue() {
     );
   }, [searchTerm, visibleRevenueBreakdownData]);
 
-  const handleExportCSV = () => {
-    alert("✅ Exporting Revenue data to CSV...");
+  const revenueExportSection = {
+    title: "Revenue",
+    headers: ["Date", "Category", "Completed Bookings", "Gross", "Discounts", "Refunds", "Net", "Commission"],
+    rows: filteredRevenueBreakdownData.map((row) => [
+      row.date,
+      row.category,
+      row.completedBookings,
+      row.gross == null ? "N/A" : row.gross,
+      row.discounts == null ? "N/A" : row.discounts,
+      row.refunds == null ? "N/A" : row.refunds,
+      row.net == null ? "N/A" : row.net,
+      row.commission == null ? "N/A" : row.commission,
+    ]),
   };
 
-  const handleExportPDF = () => {
-    alert("✅ Exporting Revenue data to PDF...");
+  const downloadCSV = () => {
+    exportSectionsToCsv(datedFileName("revenue", "csv"), [revenueExportSection]);
+  };
+
+  const downloadPDF = () => {
+    exportSectionsToPdf(datedFileName("revenue", "pdf"), "Revenue", [revenueExportSection]);
   };
 
   const openDrawer = (item: any) => {
@@ -329,11 +345,11 @@ export function Revenue() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button onClick={handleExportCSV} variant="outline" className="text-[14px] font-medium">
+          <Button onClick={downloadCSV} variant="outline" className="text-[14px] font-medium">
             <Download className="w-4 h-4 mr-2" />
             Export CSV
           </Button>
-          <Button onClick={handleExportPDF} className="bg-[#00BF63] hover:bg-[#00A356] text-[14px] font-medium">
+          <Button onClick={downloadPDF} className="bg-[#00BF63] hover:bg-[#00A356] text-[14px] font-medium">
             <FileText className="w-4 h-4 mr-2" />
             Export PDF
           </Button>

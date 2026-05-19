@@ -43,6 +43,7 @@ import {
 import { toast } from "sonner";
 import { Skeleton } from "../../components/ui/skeleton";
 import { useApi, apiCall } from "../../../hooks/useApi";
+import { datedFileName, exportSectionsToPdf } from "../../utils/exportFiles";
 
 export function BusinessReports({ hideHeader = false, apiPath = "business" }: { hideHeader?: boolean, apiPath?: string }) {
   const [isGenerateModalOpen, setIsGenerateModalOpen] = useState(false);
@@ -145,8 +146,23 @@ export function BusinessReports({ hideHeader = false, apiPath = "business" }: { 
     }
   };
 
-  const handleDownloadReport = (reportName: string) => {
-    toast.success(`Downloading ${reportName}...`);
+  const handleDownloadReport = (report: any) => {
+    exportSectionsToPdf(
+      datedFileName(String(report.name || "business-report").toLowerCase().replace(/[^a-z0-9]+/g, "-"), "pdf"),
+      report.name || "Business Report",
+      [
+        {
+          headers: ["Report Name", "Generated Date", "Format", "Size"],
+          rows: [[
+            report.name,
+            report.generatedDate ? new Date(report.generatedDate).toLocaleString("en-US") : "",
+            report.format,
+            report.size,
+          ]],
+        },
+      ]
+    );
+    toast.success(`Downloaded ${report.name}`);
   };
 
   if (error) {
@@ -418,7 +434,7 @@ export function BusinessReports({ hideHeader = false, apiPath = "business" }: { 
                       <TableCell className="text-right">
                         <Button
                           size="sm"
-                          onClick={() => handleDownloadReport(report.name)}
+                          onClick={() => handleDownloadReport(report)}
                           className="bg-[#00BF63] hover:bg-[#00A055]"
                         >
                           <Download className="w-3 h-3 mr-2" />
@@ -643,4 +659,4 @@ export function BusinessReports({ hideHeader = false, apiPath = "business" }: { 
       </Dialog>
     </div>
   );
-}
+}

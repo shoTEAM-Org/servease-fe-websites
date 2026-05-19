@@ -42,6 +42,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../components/ui/select";
+import { datedFileName, exportSectionsToPdf } from "../utils/exportFiles";
 
 export function ProviderApplicationDetail() {
   const { applicationId } = useParams();
@@ -170,6 +171,28 @@ export function ProviderApplicationDetail() {
     setShowRejectDialog(false);
     alert(`Application ${application.applicationId} rejected.\nReason: ${decisionReason}\nComment: ${decisionComment}`);
     navigate("/provider-applications");
+  };
+
+  const handleDownloadApplicationFile = (documentName: string, fileName: string) => {
+    const baseName = fileName.replace(/\.[^/.]+$/, "").toLowerCase().replace(/[^a-z0-9]+/g, "-");
+
+    exportSectionsToPdf(
+      datedFileName(`${application.applicationId.toLowerCase()}-${baseName}`, "pdf"),
+      `${documentName} - ${application.businessName}`,
+      [
+        {
+          title: "Application File",
+          headers: ["Field", "Value"],
+          rows: [
+            ["Application ID", application.applicationId],
+            ["Business", application.businessName],
+            ["Owner", application.ownerName],
+            ["Document", documentName],
+            ["File", fileName],
+          ],
+        },
+      ]
+    );
   };
 
   // Mock data for the application details
@@ -598,7 +621,7 @@ export function ProviderApplicationDetail() {
                       variant="outline"
                       size="sm"
                       className="gap-2"
-                      onClick={() => alert("Download document")}
+                      onClick={() => handleDownloadApplicationFile("Business Permit", businessPermit.fileName)}
                     >
                       <Download className="w-4 h-4" />
                       Download
@@ -685,7 +708,7 @@ export function ProviderApplicationDetail() {
                         variant="outline"
                         size="sm"
                         className="gap-2"
-                        onClick={() => alert("Download ID")}
+                        onClick={() => handleDownloadApplicationFile("Valid ID of Contact Person", contactPerson.idFileName)}
                       >
                         <Download className="w-4 h-4" />
                         Download

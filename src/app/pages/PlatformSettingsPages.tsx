@@ -25,6 +25,7 @@ import {
   TableRow,
 } from "../components/ui/table";
 import { toast } from "sonner";
+import { datedFileName, exportSectionsToCsv } from "../utils/exportFiles";
 
 // Admin type definition
 type Admin = {
@@ -413,6 +414,20 @@ export function AuditTrail() {
   const filteredLogs = auditLogs;
 
   const handleExportLogs = () => {
+    exportSectionsToCsv(datedFileName("audit-logs", "csv"), [
+      {
+        headers: ["Log ID", "Timestamp", "Admin User", "Action", "Entity", "Details", "IP Address"],
+        rows: filteredLogs.map((log: any) => [
+          log.id,
+          log.timestamp ? new Date(log.timestamp).toLocaleString("en-US") : "",
+          log.adminUser,
+          log.action,
+          log.entity,
+          log.details,
+          log.ipAddress,
+        ]),
+      },
+    ]);
     toast.success("Audit logs exported successfully");
   };
 

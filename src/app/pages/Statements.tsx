@@ -15,6 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../components/ui/select";
+import { datedFileName, exportSectionsToPdf } from "../utils/exportFiles";
 
 const platformEarnings = {
   totalGMV: "₱4,567,890",
@@ -72,6 +73,58 @@ const partnerStatements = [
 ];
 
 export function Statements() {
+  const handleExportPdf = () => {
+    exportSectionsToPdf(datedFileName("financial-statements", "pdf"), "Financial Statements", [
+      {
+        title: "Platform Earnings",
+        headers: ["Metric", "Value"],
+        rows: Object.entries(platformEarnings).map(([key, value]) => [
+          key.replace(/([A-Z])/g, " $1").trim(),
+          value,
+        ]),
+      },
+      {
+        title: "Module Breakdown",
+        headers: ["Module", "GMV", "Commission", "Rate"],
+        rows: moduleBreakdown.map((item) => [item.module, item.gmv, item.commission, item.rate]),
+      },
+      {
+        title: "Partner Statements",
+        headers: ["Partner", "Type", "Module", "Gross Sales", "Commission", "Taxes", "Refunds", "Net Payable", "Status"],
+        rows: partnerStatements.map((partner) => [
+          partner.partner,
+          partner.type,
+          partner.module,
+          partner.grossSales,
+          partner.commission,
+          partner.taxes,
+          partner.refunds,
+          partner.netPayable,
+          partner.status,
+        ]),
+      },
+    ]);
+  };
+
+  const handleDownloadPartner = (partner: typeof partnerStatements[number]) => {
+    exportSectionsToPdf(datedFileName(`${partner.partner.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-statement`, "pdf"), `${partner.partner} Statement`, [
+      {
+        headers: ["Partner", "Type", "Module", "Gross Sales", "Commission", "Taxes", "Refunds", "Net Payable", "Status"],
+        rows: [[
+          partner.partner,
+          partner.type,
+          partner.module,
+          partner.grossSales,
+          partner.commission,
+          partner.taxes,
+          partner.refunds,
+          partner.netPayable,
+          partner.status,
+        ]],
+      },
+    ]);
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -86,7 +139,7 @@ export function Statements() {
             <Filter className="w-4 h-4 mr-2" />
             Filter
           </Button>
-          <Button>
+          <Button onClick={handleExportPdf}>
             <Download className="w-4 h-4 mr-2" />
             Export PDF
           </Button>
@@ -254,7 +307,7 @@ export function Statements() {
                           </Badge>
                         </div>
                       </div>
-                      <Button variant="outline" size="sm">
+                      <Button variant="outline" size="sm" onClick={() => handleDownloadPartner(partner)}>
                         <Download className="w-4 h-4 mr-2" />
                         Download
                       </Button>

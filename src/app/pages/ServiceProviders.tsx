@@ -25,6 +25,7 @@ import type { ProviderStatus, ServiceProvider } from "../../types";
 import { ProviderDetailsDrawer } from "../components/ProviderDetailsDrawer";
 import { CSVUploadModal } from "../components/CSVUploadModal";
 import { toast } from "sonner";
+import { datedFileName, exportSectionsToPdf } from "../utils/exportFiles";
 
 export function ServiceProviders() {
   const {
@@ -250,8 +251,45 @@ export function ServiceProviders() {
   };
 
   const handleExportPDF = () => {
-    toast.info("PDF Export", {
-      description: "PDF export functionality will be available soon",
+    exportSectionsToPdf(
+      datedFileName("service-providers", "pdf"),
+      "Service Providers",
+      [
+        {
+          headers: [
+            "Provider ID",
+            "Business Name",
+            "Category",
+            "Contact Person",
+            "Email",
+            "Phone",
+            "Location",
+            "Rating",
+            "Total Bookings",
+            "Completed Bookings",
+            "Completion Rate",
+            "Status",
+          ],
+          rows: filteredProviders.map((provider) => [
+            provider.id,
+            provider.businessName,
+            getProviderCategoryName(provider),
+            provider.contactPerson,
+            provider.email,
+            provider.phone,
+            provider.location,
+            provider.rating,
+            provider.totalBookings,
+            provider.completedBookings,
+            `${provider.completionRate}%`,
+            provider.status,
+          ]),
+        },
+      ]
+    );
+
+    toast.success("PDF exported successfully", {
+      description: `${filteredProviders.length} providers exported`,
     });
   };
 

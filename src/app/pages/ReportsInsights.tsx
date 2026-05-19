@@ -51,6 +51,7 @@ import {
   Legend,
   ResponsiveContainer,
 } from "recharts";
+import { datedFileName, exportSectionsToCsv, exportSectionsToPdf } from "../utils/exportFiles";
 
 // Revenue Data
 const revenueOverTimeData = [
@@ -200,12 +201,82 @@ export function ReportsInsights() {
   const [selectedItem, setSelectedItem] = useState<any>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
 
-  const handleExportCSV = () => {
-    alert(`✅ Exporting ${activeTab} data to CSV...`);
+  const getActiveExportSection = () => {
+    if (activeTab === "bookings") {
+      return {
+        title: "Booking Analytics",
+        headers: ["Booking ID", "Scheduled Date", "Scheduled Time", "Customer", "Provider", "Category", "Service", "Status", "Amount"],
+        rows: bookingsListData.map((booking) => [
+          booking.id,
+          booking.scheduledDate,
+          booking.scheduledTime,
+          booking.customer,
+          booking.provider,
+          booking.category,
+          booking.service,
+          booking.status,
+          booking.amount,
+        ]),
+      };
+    }
+
+    if (activeTab === "providers") {
+      return {
+        title: "Provider Performance",
+        headers: ["Provider ID", "Provider", "Category Focus", "Completed Jobs", "Cancel Rate", "Average Rating", "Earnings", "Last Active"],
+        rows: providerLeaderboardData.map((provider) => [
+          provider.id,
+          provider.provider,
+          provider.categoryFocus,
+          provider.completedJobs,
+          provider.cancelRate,
+          provider.avgRating,
+          provider.earnings,
+          provider.lastActive,
+        ]),
+      };
+    }
+
+    if (activeTab === "customers") {
+      return {
+        title: "Customer Growth",
+        headers: ["Customer ID", "Customer", "Signup Date", "Total Bookings", "Last Booking", "Total Spend", "Cancellations"],
+        rows: customerSummaryData.map((customer) => [
+          customer.id,
+          customer.customer,
+          customer.signupDate,
+          customer.totalBookings,
+          customer.lastBooking,
+          customer.totalSpend,
+          customer.cancellations,
+        ]),
+      };
+    }
+
+    return {
+      title: "Revenue",
+      headers: ["Date", "Category", "Completed Bookings", "Gross", "Discounts", "Refunds", "Net", "Commission"],
+      rows: revenueBreakdownData.map((row) => [
+        row.date,
+        row.category,
+        row.completedBookings,
+        row.gross,
+        row.discounts,
+        row.refunds,
+        row.net,
+        row.commission,
+      ]),
+    };
   };
 
-  const handleExportPDF = () => {
-    alert(`✅ Exporting ${activeTab} data to PDF...`);
+  const downloadCSV = () => {
+    const section = getActiveExportSection();
+    exportSectionsToCsv(datedFileName(`reports-${activeTab}`, "csv"), [section]);
+  };
+
+  const downloadPDF = () => {
+    const section = getActiveExportSection();
+    exportSectionsToPdf(datedFileName(`reports-${activeTab}`, "pdf"), section.title || "Report", [section]);
   };
 
   const openDrawer = (item: any) => {
@@ -232,11 +303,11 @@ export function ReportsInsights() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button onClick={handleExportCSV} variant="outline" className="text-[14px] font-medium">
+          <Button onClick={downloadCSV} variant="outline" className="text-[14px] font-medium">
             <Download className="w-4 h-4 mr-2" />
             Export CSV
           </Button>
-          <Button onClick={handleExportPDF} className="bg-[#00BF63] hover:bg-[#00A356] text-[14px] font-medium">
+          <Button onClick={downloadPDF} className="bg-[#00BF63] hover:bg-[#00A356] text-[14px] font-medium">
             <FileText className="w-4 h-4 mr-2" />
             Export PDF
           </Button>

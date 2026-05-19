@@ -1,10 +1,9 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
-import { Textarea } from "../components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -49,29 +48,131 @@ import {
   Percent,
   DollarSign,
   AlertCircle,
+  Download,
+  FileText,
 } from "lucide-react";
 import { useData } from "../../contexts/DataContext";
+import { datedFileName, exportSectionsToCsv, exportSectionsToPdf } from "../utils/exportFiles";
 
-// Mock Promotions Data
-const promotionsData = [
-  { id: "PROMO-001", code: "WELCOME50", type: "Percent", value: 50, startDate: "2026-01-01", endDate: "2026-03-31", usageLimit: 1000, usageCount: 342, status: "Active", minBasket: 500, categoryRestriction: "None" },
-  { id: "PROMO-002", code: "HOMEFIX100", type: "Fixed", value: 100, startDate: "2026-02-01", endDate: "2026-04-30", usageLimit: 500, usageCount: 187, status: "Active", minBasket: 1000, categoryRestriction: "Home Maintenance" },
-  { id: "PROMO-003", code: "BEAUTY20", type: "Percent", value: 20, startDate: "2026-02-15", endDate: "2026-03-15", usageLimit: 300, usageCount: 156, status: "Active", minBasket: 800, categoryRestriction: "Beauty & Wellness" },
-  { id: "PROMO-004", code: "FLASH200", type: "Fixed", value: 200, startDate: "2026-03-01", endDate: "2026-03-07", usageLimit: 100, usageCount: 89, status: "Active", minBasket: 2000, categoryRestriction: "None" },
-  { id: "PROMO-005", code: "CLEAN15", type: "Percent", value: 15, startDate: "2026-01-15", endDate: "2026-12-31", usageLimit: 2000, usageCount: 512, status: "Active", minBasket: 600, categoryRestriction: "Cleaning Services" },
-  { id: "PROMO-006", code: "EXPIRED10", type: "Percent", value: 10, startDate: "2025-12-01", endDate: "2026-01-31", usageLimit: 500, usageCount: 500, status: "Expired", minBasket: 500, categoryRestriction: "None" },
-  { id: "PROMO-007", code: "FUTURE25", type: "Percent", value: 25, startDate: "2026-04-01", endDate: "2026-06-30", usageLimit: 800, usageCount: 0, status: "Scheduled", minBasket: 1200, categoryRestriction: "Events" },
-  { id: "PROMO-008", code: "DISABLED30", type: "Percent", value: 30, startDate: "2026-02-01", endDate: "2026-03-31", usageLimit: 200, usageCount: 45, status: "Disabled", minBasket: 1500, categoryRestriction: "None" },
-];
+type PromotionType = "Percent" | "Fixed";
+type PromotionStatus = "Active" | "Scheduled" | "Expired" | "Disabled";
+
+interface Promotion {
+  id: string;
+  code: string;
+  promoRef: string;
+  type: PromotionType;
+  value: number;
+  startDate: string;
+  endDate: string;
+  usageLimit: number;
+  usageCount: number;
+  status: PromotionStatus;
+  minBasket: number;
+  categoryRestriction: string;
+  categoryId: string;
+}
+
+interface PromotionRow {
+  id: string;
+  code: string;
+  promo_ref?: string | null;
+  type: string;
+  value: number | string;
+  start_date: string;
+  end_date: string;
+  usage_count?: number | string | null;
+  usage_limit?: number | string | null;
+  status: string;
+}
+
+interface PromoApplicableCategoryRow {
+  promo_id: string;
+  category_id: string;
+}
+
+const SUPABASE_SCHEMA = "notification_and_support";
+const SUPABASE_URL = (import.meta.env.VITE_SUPABASE_URL || "").replace(/\/$/, "");
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || "";
+
+function getSupabaseHeaders(): HeadersInit {
+  return {
+    apikey: SUPABASE_ANON_KEY,
+    Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+    "Content-Type": "application/json",
+    "Accept-Profile": SUPABASE_SCHEMA,
+    "Content-Profile": SUPABASE_SCHEMA,
+  };
+}
+
+async function supabaseRequest<T>(path: string, options: RequestInit = {}): Promise<T> {
+  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+    throw new Error("Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY.");
+  }
+
+  const response = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+    ...options,
+    headers: {
+      ...getSupabaseHeaders(),
+      ...options.headers,
+    },
+  });
+
+  if (!response.ok) {
+    const message = await response.text();
+    throw new Error(message || `Supabase request failed with status ${response.status}.`);
+  }
+
+  if (response.status === 204) {
+    return null as T;
+  }
+
+  return response.json();
+}
+
+function normalizeType(type: string): PromotionType {
+  const value = type.toLowerCase();
+  return value === "fixed" || value === "fixed_amount" || value === "amount" ? "Fixed" : "Percent";
+}
+
+function normalizeStatus(status: string): PromotionStatus {
+  const value = status.toLowerCase();
+  if (value === "scheduled") return "Scheduled";
+  if (value === "expired") return "Expired";
+  if (value === "disabled" || value === "inactive") return "Disabled";
+  return "Active";
+}
+
+function getStoredAdminId(): string | undefined {
+  try {
+    const admin = JSON.parse(localStorage.getItem("servease_admin") || "{}");
+    return typeof admin.id === "string" && admin.id ? admin.id : undefined;
+  } catch {
+    return undefined;
+  }
+}
 
 export function Promotions() {
   const { serviceCategories } = useData();
+  const categoryNameById = useMemo(
+    () => new Map(serviceCategories.map((category) => [category.id, category.name])),
+    [serviceCategories]
+  );
+  const categoryIdByName = useMemo(
+    () => new Map(serviceCategories.map((category) => [category.name, category.id])),
+    [serviceCategories]
+  );
+  const [promotionsData, setPromotionsData] = useState<Promotion[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [selectedPromotion, setSelectedPromotion] = useState<any>(null);
+  const [selectedPromotion, setSelectedPromotion] = useState<Promotion | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [formData, setFormData] = useState({
     code: "",
     type: "Percent",
@@ -83,6 +184,51 @@ export function Promotions() {
     categoryRestriction: "None",
     status: "Active",
   });
+
+  const fetchPromotions = async () => {
+    setIsLoading(true);
+    setErrorMessage("");
+
+    try {
+      const [rows, categoryRows] = await Promise.all([
+        supabaseRequest<PromotionRow[]>("promotions?select=*&order=created_at.desc"),
+        supabaseRequest<PromoApplicableCategoryRow[]>("promo_applicable_categories?select=promo_id,category_id"),
+      ]);
+      const categoryIdByPromoId = new Map(
+        categoryRows.map((row) => [row.promo_id, row.category_id])
+      );
+
+      setPromotionsData(
+        rows.map((row) => {
+          const categoryId = categoryIdByPromoId.get(row.id) || "";
+
+          return {
+            id: row.id,
+            code: row.code,
+            promoRef: row.promo_ref || "",
+            type: normalizeType(row.type),
+            value: Number(row.value) || 0,
+            startDate: row.start_date,
+            endDate: row.end_date,
+            usageLimit: Number(row.usage_limit) || 0,
+            usageCount: Number(row.usage_count) || 0,
+            status: normalizeStatus(row.status),
+            minBasket: 0,
+            categoryRestriction: categoryId ? categoryNameById.get(categoryId) || categoryId : "None",
+            categoryId,
+          };
+        })
+      );
+    } catch (error: any) {
+      setErrorMessage(error.message || "Unable to load promotions.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchPromotions();
+  }, [categoryNameById]);
 
   // Filter promotions
   const filteredPromotions = promotionsData.filter((promo) => {
@@ -98,6 +244,43 @@ export function Promotions() {
     active: promotionsData.filter((p) => p.status === "Active").length,
     scheduled: promotionsData.filter((p) => p.status === "Scheduled").length,
     expired: promotionsData.filter((p) => p.status === "Expired").length,
+  };
+
+  const promotionExportSection = {
+    headers: [
+      "ID",
+      "Code",
+      "Reference",
+      "Type",
+      "Value",
+      "Start Date",
+      "End Date",
+      "Usage Count",
+      "Usage Limit",
+      "Status",
+      "Category Restriction",
+    ],
+    rows: filteredPromotions.map((promotion) => [
+      promotion.id,
+      promotion.code,
+      promotion.promoRef,
+      promotion.type,
+      promotion.type === "Percent" ? `${promotion.value}%` : `PHP ${promotion.value}`,
+      promotion.startDate,
+      promotion.endDate,
+      promotion.usageCount,
+      promotion.usageLimit,
+      promotion.status,
+      promotion.categoryRestriction,
+    ]),
+  };
+
+  const handleExportCSV = () => {
+    exportSectionsToCsv(datedFileName("promotions", "csv"), [promotionExportSection]);
+  };
+
+  const handleExportPDF = () => {
+    exportSectionsToPdf(datedFileName("promotions", "pdf"), "Promotions", [promotionExportSection]);
   };
 
   const handleAdd = () => {
@@ -116,7 +299,7 @@ export function Promotions() {
     setIsDialogOpen(true);
   };
 
-  const handleEdit = (promotion: any) => {
+  const handleEdit = (promotion: Promotion) => {
     setSelectedPromotion(promotion);
     setFormData({
       code: promotion.code,
@@ -132,27 +315,124 @@ export function Promotions() {
     setIsDialogOpen(true);
   };
 
-  const handleSave = () => {
-    console.log("Saving promotion:", formData);
-    alert(`✅ Promotion ${selectedPromotion ? "updated" : "created"} successfully!`);
-    setIsDialogOpen(false);
+  const handleSave = async () => {
+    if (!formData.code || !formData.value || !formData.startDate || !formData.endDate || !formData.usageLimit) {
+      alert("Please fill in all required promotion fields.");
+      return;
+    }
+
+    setIsSaving(true);
+    const categoryId =
+      formData.categoryRestriction === "None"
+        ? ""
+        : categoryIdByName.get(formData.categoryRestriction) || formData.categoryRestriction;
+    const promotionPayload = {
+      code: formData.code.trim().toUpperCase(),
+      promo_ref: selectedPromotion?.promoRef || formData.code.trim().toUpperCase(),
+      type: formData.type,
+      value: Number(formData.value),
+      start_date: formData.startDate,
+      end_date: formData.endDate,
+      usage_limit: Number(formData.usageLimit),
+      status: formData.status,
+    };
+    const adminId = getStoredAdminId();
+    const savePayload = selectedPromotion
+      ? { ...promotionPayload, ...(adminId ? { updated_by: adminId } : {}) }
+      : {
+          ...promotionPayload,
+          ...(adminId ? { created_by: adminId, updated_by: adminId } : {}),
+        };
+
+    try {
+      const savedRows = selectedPromotion
+        ? await supabaseRequest<PromotionRow[]>(
+            `promotions?id=eq.${encodeURIComponent(selectedPromotion.id)}`,
+            {
+              method: "PATCH",
+              headers: { Prefer: "return=representation" },
+              body: JSON.stringify(savePayload),
+            }
+          )
+        : await supabaseRequest<PromotionRow[]>("promotions", {
+            method: "POST",
+            headers: { Prefer: "return=representation" },
+            body: JSON.stringify(savePayload),
+          });
+      const savedPromotionId = savedRows[0]?.id || selectedPromotion?.id;
+
+      if (savedPromotionId) {
+        await supabaseRequest<null>(
+          `promo_applicable_categories?promo_id=eq.${encodeURIComponent(savedPromotionId)}`,
+          { method: "DELETE" }
+        );
+
+        if (categoryId) {
+          await supabaseRequest<unknown>("promo_applicable_categories", {
+            method: "POST",
+            body: JSON.stringify({ promo_id: savedPromotionId, category_id: categoryId }),
+          });
+        }
+      }
+
+      await fetchPromotions();
+      alert(`Promotion ${selectedPromotion ? "updated" : "created"} successfully!`);
+      setIsDialogOpen(false);
+    } catch (error: any) {
+      alert(error.message || "Unable to save promotion.");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
-  const handleDelete = (promotion: any) => {
+  const handleDelete = (promotion: Promotion) => {
     setSelectedPromotion(promotion);
     setDeleteDialogOpen(true);
   };
 
-  const confirmDelete = () => {
-    console.log("Deleting promotion:", selectedPromotion);
-    alert(`✅ Promotion "${selectedPromotion?.code}" deleted successfully!`);
-    setDeleteDialogOpen(false);
-    setSelectedPromotion(null);
+  const confirmDelete = async () => {
+    if (!selectedPromotion) return;
+
+    setIsDeleting(true);
+    try {
+      await supabaseRequest<null>(
+        `promo_applicable_categories?promo_id=eq.${encodeURIComponent(selectedPromotion.id)}`,
+        { method: "DELETE" }
+      );
+      await supabaseRequest<null>(
+        `promotions?id=eq.${encodeURIComponent(selectedPromotion.id)}`,
+        { method: "DELETE" }
+      );
+      await fetchPromotions();
+      alert(`Promotion "${selectedPromotion.code}" deleted successfully!`);
+      setDeleteDialogOpen(false);
+      setSelectedPromotion(null);
+    } catch (error: any) {
+      alert(error.message || "Unable to delete promotion.");
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
-  const disablePromotion = (promotion: any) => {
-    console.log("Disabling promotion:", promotion.code);
-    alert(`✅ Promotion "${promotion.code}" disabled successfully!`);
+  const disablePromotion = async (promotion: Promotion) => {
+    try {
+      const adminId = getStoredAdminId();
+      await supabaseRequest<PromotionRow[]>(
+        `promotions?id=eq.${encodeURIComponent(promotion.id)}`,
+        {
+          method: "PATCH",
+          headers: { Prefer: "return=representation" },
+          body: JSON.stringify({
+            status: "Disabled",
+            ...(adminId ? { updated_by: adminId } : {}),
+          }),
+        }
+      );
+      await fetchPromotions();
+      alert(`Promotion "${promotion.code}" disabled successfully!`);
+    } catch (error: any) {
+      alert(error.message || "Unable to disable promotion.");
+    }
   };
 
   const getStatusBadge = (status: string) => {
@@ -264,13 +544,33 @@ export function Promotions() {
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle>Promotions List</CardTitle>
-            <Button className="bg-[#00BF63] hover:bg-[#00A055] text-white" onClick={handleAdd}>
-              <Plus className="w-4 h-4 mr-2" />
-              Create Promotion
-            </Button>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button variant="outline" size="sm" onClick={handleExportCSV}>
+                <Download className="w-4 h-4 mr-2" />
+                Export CSV
+              </Button>
+              <Button size="sm" onClick={handleExportPDF} className="bg-[#00BF63] hover:bg-[#00A055] text-white">
+                <FileText className="w-4 h-4 mr-2" />
+                Export PDF
+              </Button>
+              <Button className="bg-[#00BF63] hover:bg-[#00A055] text-white" onClick={handleAdd}>
+                <Plus className="w-4 h-4 mr-2" />
+                Create Promotion
+              </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent>
+          {errorMessage && (
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-start gap-2">
+              <AlertCircle className="w-5 h-5 text-red-600 mt-0.5" />
+              <div>
+                <p className="text-sm font-medium text-red-900">Unable to load promotions</p>
+                <p className="text-xs text-red-700 mt-1">{errorMessage}</p>
+              </div>
+            </div>
+          )}
+
           {/* Search & Filters */}
           <div className="mb-6 grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="relative">
@@ -324,6 +624,13 @@ export function Promotions() {
                 </TableRow>
               </TableHeader>
               <TableBody>
+                {isLoading && (
+                  <TableRow>
+                    <TableCell colSpan={8} className="text-center text-gray-500 py-8">
+                      Loading promotions...
+                    </TableCell>
+                  </TableRow>
+                )}
                 {filteredPromotions.map((promotion) => (
                   <TableRow key={promotion.id}>
                     <TableCell>
@@ -367,12 +674,17 @@ export function Promotions() {
                         <div className="w-full bg-gray-200 rounded-full h-1.5 mt-1">
                           <div
                             className={`h-1.5 rounded-full ${
+                              promotion.usageLimit > 0 &&
                               (promotion.usageCount / promotion.usageLimit) * 100 > 80
                                 ? "bg-orange-500"
                                 : "bg-[#00BF63]"
                             }`}
                             style={{
-                              width: `${(promotion.usageCount / promotion.usageLimit) * 100}%`,
+                              width: `${
+                                promotion.usageLimit > 0
+                                  ? Math.min((promotion.usageCount / promotion.usageLimit) * 100, 100)
+                                  : 0
+                              }%`,
                             }}
                           />
                         </div>
@@ -409,7 +721,7 @@ export function Promotions() {
             </Table>
           </div>
 
-          {filteredPromotions.length === 0 && (
+          {!isLoading && filteredPromotions.length === 0 && (
             <div className="text-center py-12">
               <Tag className="w-12 h-12 text-gray-300 mx-auto mb-4" />
               <p className="text-gray-500">No promotions found</p>
@@ -560,8 +872,16 @@ export function Promotions() {
             <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
               Cancel
             </Button>
-            <Button className="bg-[#00BF63] hover:bg-[#00A055]" onClick={handleSave}>
-              {selectedPromotion ? "Update Promotion" : "Create Promotion"}
+            <Button
+              className="bg-[#00BF63] hover:bg-[#00A055]"
+              onClick={handleSave}
+              disabled={isSaving}
+            >
+              {isSaving
+                ? "Saving..."
+                : selectedPromotion
+                  ? "Update Promotion"
+                  : "Create Promotion"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -582,8 +902,9 @@ export function Promotions() {
             <AlertDialogAction
               onClick={confirmDelete}
               className="bg-red-600 hover:bg-red-700"
+              disabled={isDeleting}
             >
-              Delete Promotion
+              {isDeleting ? "Deleting..." : "Delete Promotion"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

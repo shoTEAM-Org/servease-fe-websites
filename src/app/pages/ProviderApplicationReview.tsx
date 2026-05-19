@@ -56,6 +56,7 @@ import {
   Calendar,
   Lock,
 } from "lucide-react";
+import { datedFileName, exportSectionsToPdf } from "../utils/exportFiles";
 
 /* ─── MOCK DATA ─────────────────────────────────────────────────── */
 const buildApplication = (
@@ -537,6 +538,30 @@ export function ProviderApplicationReview() {
     setRotation(0);
     setCompareMode(false);
     setShowDocModal(true);
+  };
+
+  const handleDownloadSelectedDoc = () => {
+    if (!selectedDoc) return;
+
+    exportSectionsToPdf(
+      datedFileName(`${application.applicationId.toLowerCase()}-${selectedDoc.id}`, "pdf"),
+      `${selectedDoc.name} - ${application.businessName}`,
+      [
+        {
+          title: "Document Details",
+          headers: ["Field", "Value"],
+          rows: [
+            ["Application ID", application.applicationId],
+            ["Business", application.businessName],
+            ["Owner", application.ownerName],
+            ["Document", selectedDoc.name],
+            ["File", selectedDoc.file],
+            ["Uploaded", selectedDoc.date],
+            ["Status", selectedDoc.status],
+          ],
+        },
+      ]
+    );
   };
 
   const handleApproveApplication = async () => {
@@ -1240,7 +1265,7 @@ export function ProviderApplicationReview() {
               <Button size="sm" variant="outline" className="gap-1.5 text-xs shrink-0" onClick={() => { setZoomLevel(100); setRotation(0); }}>
                 Reset
               </Button>
-              <Button size="sm" variant="outline" className="gap-1.5 text-xs shrink-0">
+              <Button size="sm" variant="outline" className="gap-1.5 text-xs shrink-0" onClick={handleDownloadSelectedDoc}>
                 <Download className="w-3 h-3" />Download
               </Button>
               <Button

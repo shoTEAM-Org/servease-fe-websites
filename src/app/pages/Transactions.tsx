@@ -37,6 +37,7 @@ import {
 } from "lucide-react";
 import { useData } from "../../contexts/DataContext";
 import type { PaymentStatus } from "../../types";
+import { datedFileName, exportSectionsToPdf } from "../utils/exportFiles";
 
 type TransactionTab = "all" | "earnings" | "failed";
 
@@ -119,6 +120,34 @@ export function Transactions() {
     }
   };
 
+  const handleExportReport = () => {
+    exportSectionsToPdf(datedFileName("transactions-report", "pdf"), "Transactions Report", [
+      {
+        title: "Transactions",
+        headers: ["Transaction ID", "Booking ID", "Customer", "Provider", "Category", "Payment Method", "Amount", "Commission", "Provider Earnings", "Status", "Date"],
+        rows: filteredTransactions.map((transaction) => {
+          const customer = getCustomerById(transaction.customerId);
+          const provider = getProviderById(transaction.providerId);
+          const category = getCategoryById(provider?.categoryId || "");
+
+          return [
+            transaction.id,
+            transaction.bookingId,
+            customer?.name || "N/A",
+            provider?.businessName || "N/A",
+            category?.name || "N/A",
+            transaction.paymentMethod,
+            transaction.amount,
+            transaction.commissionAmount,
+            transaction.providerEarnings,
+            transaction.paymentStatus,
+            new Date(transaction.timestamp).toLocaleString("en-US"),
+          ];
+        }),
+      },
+    ]);
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -129,7 +158,7 @@ export function Transactions() {
             Monitor all card payment transactions across the platform
           </p>
         </div>
-        <Button className="bg-[#16A34A] hover:bg-[#15803D]">
+        <Button className="bg-[#16A34A] hover:bg-[#15803D]" onClick={handleExportReport}>
           <Download className="w-4 h-4 mr-2" />
           Export Report
         </Button>
